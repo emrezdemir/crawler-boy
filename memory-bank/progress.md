@@ -2,6 +2,11 @@
 
 _Last updated: 2026-06-14_
 
+## ✅ Done (v1.3.0)
+- [x] Optional **organize-by-file-type** download layout: `assets/<ext>/<file>`
+      (one folder per extension), collision-safe readable names, ext from URL or
+      Content-Type. Toggle off = standard mirror layout. (`Downloader._extensionPath`)
+
 ## ✅ Done (v1.2.0 — performance)
 - [x] **Worker-thread analyzer pool** (`AnalyzerPool` + `analyzer-worker.js`):
       parse + recon moved off the main thread. Fixes the Windows freeze /

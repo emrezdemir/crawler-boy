@@ -117,6 +117,25 @@ const EXT_TO_CATEGORY = (() => {
   return map;
 })();
 
+// Common content-type → extension, for assets whose URL has no usable suffix.
+const CONTENT_TYPE_EXT = {
+  'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'image/gif': 'gif',
+  'image/webp': 'webp', 'image/svg+xml': 'svg', 'image/avif': 'avif', 'image/bmp': 'bmp',
+  'image/x-icon': 'ico', 'image/vnd.microsoft.icon': 'ico', 'image/tiff': 'tiff',
+  'application/pdf': 'pdf', 'text/css': 'css', 'text/html': 'html', 'text/plain': 'txt',
+  'application/javascript': 'js', 'text/javascript': 'js', 'application/json': 'json',
+  'application/xml': 'xml', 'text/xml': 'xml', 'video/mp4': 'mp4', 'video/webm': 'webm',
+  'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'audio/ogg': 'ogg', 'font/woff2': 'woff2',
+  'font/woff': 'woff', 'font/ttf': 'ttf', 'application/zip': 'zip', 'application/gzip': 'gz',
+};
+
+/** Best-effort extension (no dot) from a Content-Type header. '' if unknown. */
+function extFromContentType(contentType) {
+  if (!contentType) return '';
+  const base = contentType.split(';')[0].trim().toLowerCase();
+  return CONTENT_TYPE_EXT[base] || '';
+}
+
 /** Lower-cased file extension (no dot) parsed from a URL's pathname. */
 function extOf(url) {
   try {
@@ -240,6 +259,7 @@ module.exports = {
   ASSET_CATEGORIES,
   EXT_TO_CATEGORY,
   extOf,
+  extFromContentType,
   categoryOf,
   safeName,
   formatBytes,

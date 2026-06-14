@@ -73,6 +73,7 @@ class CrawlEngine extends EventEmitter {
       categories: new Set(config.categories || []),
       maxFileSize: config.maxFileSize || 0,
       savePages: !!config.savePages,
+      organizeByExtension: !!config.organizeByExtension,
     });
 
     this.include = compilePatterns(config.includePatterns);

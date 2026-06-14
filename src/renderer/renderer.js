@@ -68,6 +68,7 @@ function gatherConfig() {
     categories,
     maxFileSize: int($('maxFileSize').value, 0) * 1024 * 1024,
     assetConcurrency: int($('assetConcurrency').value, 4),
+    organizeByExtension: $('organizeByExtension').checked,
     savePages: $('savePages').checked,
     rotateUserAgent: $('rotateUserAgent').checked,
     userAgent: $('userAgent').value.trim() || undefined,

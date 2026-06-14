@@ -4,6 +4,10 @@ _Last updated: 2026-06-14_
 
 ## Current focus
 
+**v1.3.0 — download organization.** Added an optional "group files into a folder
+per type" toggle (`assets/png/`, `assets/jpg/`, …) for grab-all-the-images style
+runs; default stays the site-mirror layout. (`Downloader._extensionPath`.)
+
 **v1.2.0 — performance fix.** A user hit a Windows freeze on a large crawl: the
 main process was CPU-blocked doing synchronous cheerio parsing + recon regexes on
 ~1 MB pages across concurrent workers, which froze Electron's window message loop.

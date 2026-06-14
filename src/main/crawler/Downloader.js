@@ -3,7 +3,13 @@
 const fs = require('fs');
 const fsp = require('fs/promises');
 const path = require('path');
-const { urlToLocalPath, safeName, hashString } = require('./utils');
+const {
+  urlToLocalPath,
+  safeName,
+  hashString,
+  extOf,
+  extFromContentType,
+} = require('./utils');
 
 /**
  * Downloader — owns the on-disk layout for a crawl session and persists
@@ -11,7 +17,10 @@ const { urlToLocalPath, safeName, hashString } = require('./utils');
  *
  *   <outputRoot>/<session>/
  *     ├─ pages/      full HTML mirror (optional)
- *     ├─ assets/<category>/<host>/<path>   downloaded files
+ *     ├─ assets/...  downloaded files. Two layouts:
+ *     │     • default            → assets/<category>/<host>/<path>  (site mirror)
+ *     │     • organizeByExtension → assets/<ext>/<file>             (one folder
+ *     │                              per file type: png/, jpg/, pdf/, …)
  *     └─ data/       crawl-data.json, links.json, errors.json
  *
  * It de-duplicates by URL, enforces a max file size, and tracks byte totals.
@@ -24,14 +33,17 @@ class Downloader {
    * @param {Set<string>} opts.categories enabled asset categories.
    * @param {number} opts.maxFileSize  bytes; 0 = unlimited.
    * @param {boolean} opts.savePages   write the HTML mirror.
+   * @param {boolean} opts.organizeByExtension group files into per-extension folders.
    */
-  constructor({ sessionDir, fetcher, categories, maxFileSize = 0, savePages = false }) {
+  constructor({ sessionDir, fetcher, categories, maxFileSize = 0, savePages = false, organizeByExtension = false }) {
     this.sessionDir = sessionDir;
     this.fetcher = fetcher;
     this.categories = categories instanceof Set ? categories : new Set(categories || []);
     this.maxFileSize = maxFileSize;
     this.savePages = savePages;
+    this.organizeByExtension = organizeByExtension;
     this.downloaded = new Set(); // asset URLs already handled
+    this.usedPaths = new Set(); // taken file paths (for collision-free flat folders)
     this.bytes = 0;
     this.count = 0;
   }
@@ -83,8 +95,9 @@ class Downloader {
     }
 
     try {
-      const rel = urlToLocalPath(url, { indexName: `asset_${hashString(url)}.bin` });
-      const full = path.join(this.sessionDir, 'assets', type, rel);
+      const full = this.organizeByExtension
+        ? this._extensionPath(url, result.contentType)
+        : path.join(this.sessionDir, 'assets', type, urlToLocalPath(url, { indexName: `asset_${hashString(url)}.bin` }));
       await fsp.mkdir(path.dirname(full), { recursive: true });
       await fsp.writeFile(full, result.buffer);
       this.bytes += result.buffer.length;
@@ -93,6 +106,32 @@ class Downloader {
     } catch (err) {
       return { status: 'error', reason: err.message };
     }
+  }
+
+  /**
+   * Build a collision-free path inside a per-extension folder:
+   * assets/<ext>/<file>. Keeps readable names; disambiguates clashes with a hash.
+   */
+  _extensionPath(url, contentType) {
+    const ext = (extOf(url) || extFromContentType(contentType) || 'other').toLowerCase();
+    let base = '';
+    try {
+      const u = new URL(url);
+      base = safeName(decodeURIComponent(u.pathname.split('/').filter(Boolean).pop() || ''), '');
+    } catch {
+      base = '';
+    }
+    if (!base) base = `file_${hashString(url).slice(0, 8)}`;
+    if (ext && !base.toLowerCase().endsWith(`.${ext}`)) base += `.${ext}`;
+
+    let full = path.join(this.sessionDir, 'assets', ext, base);
+    if (this.usedPaths.has(full.toLowerCase())) {
+      const e = path.extname(base);
+      const stem = base.slice(0, base.length - e.length);
+      full = path.join(this.sessionDir, 'assets', ext, `${stem}__${hashString(url).slice(0, 8)}${e}`);
+    }
+    this.usedPaths.add(full.toLowerCase());
+    return full;
   }
 
   /** Write the structured crawl results to data/. */

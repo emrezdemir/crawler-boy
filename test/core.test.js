@@ -25,6 +25,9 @@ ok(u.compilePatterns('/wiki/\nSpecial:').length === 2, 'compilePatterns splits l
 ok(u.isTracker('https://www.googletagmanager.com/gtm.js') === true, 'isTracker flags googletagmanager');
 ok(u.isTracker('https://sb.scorecardresearch.com/beacon.js') === true, 'isTracker flags scorecardresearch');
 ok(u.isTracker('https://static.wikia.nocookie.net/img/x.png') === false, 'isTracker passes a real asset host');
+ok(u.extFromContentType('image/png; charset=binary') === 'png', 'extFromContentType maps image/png');
+ok(u.extFromContentType('application/pdf') === 'pdf', 'extFromContentType maps pdf');
+ok(u.extFromContentType('') === '', 'extFromContentType empty for none');
 
 console.log('Frontier:');
 const f = new Frontier({ order: 'bfs' });
@@ -91,6 +94,16 @@ ok(audit.missingHeaders.includes('content-security-policy'), 'audit flags missin
 ok(audit.https === true, 'audit detects https');
 ok(audit.tech.some(t => /nginx/i.test(t)), 'fingerprint detects server (nginx)');
 ok(audit.tech.includes('WordPress'), 'fingerprint detects WordPress');
+
+console.log('Downloader (organize by extension):');
+const Downloader = require('../src/main/crawler/Downloader');
+const dl = new Downloader({ sessionDir: '/tmp/sess', organizeByExtension: true });
+const ep1 = dl._extensionPath('https://x.com/a/b/Photo.PNG', 'image/png');
+ok(/[\\/]assets[\\/]png[\\/]Photo\.PNG$/i.test(ep1), 'extensionPath → assets/png/Photo.PNG');
+const ep2 = dl._extensionPath('https://x.com/c/Photo.PNG', 'image/png');
+ok(ep2 !== ep1 && /Photo__[0-9a-f]{8}\.PNG$/i.test(ep2), 'extensionPath disambiguates same-name files');
+const ep3 = dl._extensionPath('https://x.com/icon', 'image/svg+xml');
+ok(/[\\/]assets[\\/]svg[\\/]icon\.svg$/i.test(ep3), 'extensionPath uses content-type when URL has no ext');
 
 console.log('RobotsManager:');
 (async () => {

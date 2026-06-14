@@ -55,7 +55,9 @@ would see.
   lazy-load `data-src`, inline CSS `url()`, `<link>` resources.
 - **Max file-size** guard and bounded download concurrency.
 - Optional **full HTML mirror** for offline browsing.
-- Mirrors the site's path structure on disk.
+- Two on-disk layouts: **mirror** the site's path structure (default), or
+  **organize by file type** — one folder per extension (`png/`, `jpg/`, `pdf/`, …)
+  for when you just want all the images/documents in one place.
 
 ### Stealth & rendering (white-hat toolbox)
 - Built-in **user-agent pool** with optional rotation.
@@ -124,7 +126,9 @@ fully-built content comes through.
 ```
 <output>/<session>/
 ├─ pages/      full HTML mirror (if enabled)
-├─ assets/<category>/<host>/<path>   downloaded files
+├─ assets/     downloaded files. Layout depends on the "group by file type" toggle:
+│                off → assets/<category>/<host>/<path>   (site mirror)
+│                on  → assets/<ext>/<file>               (png/, jpg/, pdf/ …)
 └─ data/
    ├─ crawl-data.json   pages + summary
    ├─ assets.json       downloaded files index

@@ -14,6 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Plugin/hook system for custom extractors.
 - Scheduling (cron-style recurring crawls).
 
+## [1.3.0] — 2026-06-14
+
+### Added
+- **Organize downloads by file type** (optional): a new Downloads toggle saves
+  every downloaded file into a folder named after its extension —
+  `assets/png/`, `assets/jpg/`, `assets/pdf/`, … — instead of mirroring the
+  site's path structure. Great for "just grab all the images/PDFs". Filenames
+  stay readable; clashes are disambiguated with a short hash. The extension is
+  taken from the URL, falling back to the `Content-Type`. When the toggle is off,
+  the standard `assets/<category>/<host>/<path>` mirror layout is used.
+
 ## [1.2.0] — 2026-06-14
 
 ### Performance (fixes UI freezing on large crawls)
