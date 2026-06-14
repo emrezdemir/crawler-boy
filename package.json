@@ -1,0 +1,84 @@
+{
+  "name": "crawlerboy",
+  "version": "1.0.0",
+  "description": "CrawlerBoy — a powerful, cross-platform desktop web crawler built with Electron. Crawls even JavaScript-heavy, bot-protected sites by rendering them in a real Chromium engine.",
+  "author": "emrezdemir",
+  "license": "MIT",
+  "main": "src/main/main.js",
+  "homepage": "./",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/emrezdemir/crawler-boy.git"
+  },
+  "bugs": {
+    "url": "https://github.com/emrezdemir/crawler-boy/issues"
+  },
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "test": "node test/core.test.js",
+    "test:crawl": "electron test/integration.crawl.js",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "keywords": [
+    "web-crawler",
+    "scraper",
+    "spider",
+    "electron",
+    "crawler",
+    "site-downloader",
+    "osint",
+    "cross-platform"
+  ],
+  "dependencies": {
+    "cheerio": "^1.0.0"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.crawlerboy.app",
+    "productName": "CrawlerBoy",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "assets/icon.png"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.developer-tools",
+      "icon": "assets/icon.png"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Development",
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

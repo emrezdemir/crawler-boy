@@ -1,0 +1,78 @@
+# System Patterns
+
+## High-level architecture
+
+```
+Renderer (sandboxed UI)
+    │  window.crawler.*  (preload contextBridge)
+    ▼
+Main process (Electron)
+    ├─ IPC handlers (main.js)
+    └─ CrawlEngine (EventEmitter)
+         ├─ Frontier        URL queue + visited set
+         ├─ RobotsManager   robots.txt fetch/parse/evaluate
+         ├─ Fetcher         HTTP + Chromium render + auto-escalation
+         ├─ Parser          link & asset extraction (cheerio)
+         └─ Downloader      disk layout, saving, exporters
+```
+
+Events flow **up** (`engine.emit` → `main.js` → `webContents.send` → renderer).
+Commands flow **down** (`renderer` → `ipcRenderer.invoke` → `ipcMain.handle`).
+
+## Key design decisions
+
+### 1. The Fetcher is the only Electron-aware crawler module
+Everything else in `crawler/` is plain Node and unit-testable. `Fetcher` lazily
+`require('electron')` so the engine could even run headless in tests.
+
+### 2. Render windows are POOLED, not per-fetch
+Creating and `destroy()`-ing a `BrowserWindow` for every page caused a **native
+crash on the second window** (the first always worked). The fix: keep a pool of
+up to `renderConcurrency` long-lived windows and `loadURL` into them, releasing
+back to the pool after each fetch. A window that errors or whose renderer process
+dies is retired and replaced. This is both more stable and faster, and it keeps
+session/cookie continuity across pages. An ad/tracker `onBeforeRequest` filter
+runs on the render session to cut noise and bandwidth.
+
+### 3. Auto-escalation strategy
+`Auto` mode does an HTTP fetch, then runs `_looksBlocked()` heuristics:
+- blocking status codes (401/403/406/429/503) or network error,
+- suspiciously tiny body (< 600 bytes),
+- known challenge markers ("just a moment", "cf-browser-verification", …).
+If blocked, it re-fetches the same URL via a hidden `BrowserWindow`, runs the
+page's JS, settles, optionally waits for a selector / auto-scrolls, then reads
+`document.documentElement.outerHTML`.
+
+### 4. Worker-pool concurrency with a shared frontier
+`CrawlEngine` spawns N workers that pull from one `Frontier`. Termination =
+frontier empty **and** `active === 0`. Pause/stop are cooperative state flags
+checked in the worker loop.
+
+### 5. Per-host politeness, computed synchronously
+`_throttle(host)` updates a `hostNext` timestamp map *before* awaiting, which
+serializes spacing per host even across concurrent workers. Robots `Crawl-delay`
+overrides the configured delay when larger.
+
+### 6. De-duplication by normalized URL
+`normalizeUrl` (strip fragment, lowercase host, drop default ports) is the single
+identity function used by the frontier, parser, and scope checks.
+
+### 7. Exhaustive-but-bounded extraction
+`Parser` looks everywhere URLs hide (srcset, `<source>`, lazy attrs, inline CSS
+`url()`, `<link>`). The Downloader bounds it: category filter, max file size,
+download concurrency pool, dedupe set.
+
+### 8. Fail-soft everywhere
+Bad URLs, malformed HTML, missing robots.txt, failed downloads → recorded as
+errors and the crawl continues. One bad page never kills a run.
+
+## Security posture
+
+- `contextIsolation: true`, `nodeIntegration: false`, sandboxed renderer.
+- Strict CSP in `index.html` (`default-src 'self'`).
+- Renderer talks to main only through the explicit `preload` API surface.
+- Rendering windows load with `images:false` and muted audio (DOM only, faster).
+
+## Data / output layout
+
+See `Downloader`: `<session>/{pages,assets/<category>/<host>/<path>,data/*.json}`.

@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build output
+dist/
+release/
+out/
+*.asar
+
+# Crawl output (default working folder) — never commit scraped data
+crawls/
+output/
+downloads/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS / Editor cruft
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Env / secrets
+.env
+.env.local
+config.local.json

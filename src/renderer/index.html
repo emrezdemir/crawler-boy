@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self';" />
+  <title>CrawlerBoy</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- ===================== DISCLAIMER / CONSENT GATE ===================== -->
+  <div class="modal-backdrop" id="disclaimerModal">
+    <div class="modal">
+      <div class="modal-head">
+        <span class="logo">🩸</span>
+        <h2>CrawlerBoy — Terms of Use &amp; Disclaimer</h2>
+      </div>
+      <div class="modal-body" id="termsBody">
+        <p class="lead">Please read and accept before using CrawlerBoy.</p>
+
+        <h3>🎓 Educational purpose</h3>
+        <p>CrawlerBoy is provided <strong>for educational and research purposes only</strong>.
+           It is a tool to learn about web crawling, archiving, and site analysis.</p>
+
+        <h3>📄 License (MIT) &amp; “as is”, no warranty</h3>
+        <p>This software is released under the <strong>MIT License</strong> and is provided
+           <strong>“AS IS”, without warranty of any kind</strong>, express or implied. You use it
+           entirely at your own risk.</p>
+
+        <h3>⚖️ Disclaimer of liability</h3>
+        <p>To the maximum extent permitted by law, the authors and contributors accept
+           <strong>no liability</strong> for any damage, data loss, legal consequence, service
+           disruption, or other harm arising from the use or misuse of this software.
+           <strong>You — the operator — are solely responsible</strong> for what you crawl and
+           how you use the results.</p>
+
+        <h3>✅ Acceptable use (good-faith, white-hat)</h3>
+        <ul>
+          <li>Only crawl websites you <strong>own</strong> or are <strong>authorized</strong> to access.</li>
+          <li>Respect <code>robots.txt</code>, rate limits, and each site’s Terms of Service.</li>
+          <li>Be polite: throttle requests; never overload or disrupt a service.</li>
+          <li>Do <strong>not</strong> use CrawlerBoy for denial-of-service, authentication bypass,
+              circumventing paywalls, or harvesting personal data.</li>
+          <li>Comply with all applicable local, national, and international laws.</li>
+        </ul>
+
+        <h3>🚫 Prohibited use</h3>
+        <p>Any malicious, illegal, or abusive use is strictly prohibited and is solely the
+           responsibility of the user. If you do not agree, do not use this software.</p>
+
+        <p class="fineprint">Full terms: see <code>GRAND_RULES.md</code>, <code>DISCLAIMER.md</code>,
+           and <code>LICENSE</code> in the project repository.</p>
+      </div>
+      <div class="modal-foot">
+        <label class="check agree-line">
+          <input type="checkbox" id="agreeCheck" />
+          I have read, understood, and agree to the Terms of Use and Disclaimer above, and I will
+          use CrawlerBoy lawfully and in good faith.
+        </label>
+        <label class="check remember-line">
+          <input type="checkbox" id="rememberCheck" /> Don’t show this again on this computer
+        </label>
+        <div class="modal-actions">
+          <button class="danger" id="declineBtn">Decline &amp; Exit</button>
+          <button class="primary" id="agreeBtn" disabled>Agree &amp; Continue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== APP ===================== -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🩸</span>
+      <div>
+        <h1>CrawlerBoy</h1>
+        <p class="tagline">Cross-platform deep web crawler &amp; site downloader</p>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span id="appMeta" class="meta-pill">…</span>
+      <a href="#" id="termsLink" class="meta-pill link">Terms</a>
+      <a href="#" id="githubLink" class="meta-pill link">★ Open Source</a>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- ============================ CONFIG ============================ -->
+    <aside class="config" id="configPanel">
+      <div class="lock-banner" id="lockBanner">🔒 Settings are locked while crawling — press Stop to edit.</div>
+
+      <section class="card" data-card>
+        <h2 class="card-head">① Target <span class="chev">▾</span></h2>
+        <div class="card-body">
+          <label class="field">
+            <span>Seed URL(s) <small>— one per line</small></span>
+            <textarea id="seedUrl" rows="2" placeholder="https://example.com"></textarea>
+          </label>
+        </div>
+      </section>
+
+      <section class="card" data-card>
+        <h2 class="card-head">② Engine <span class="chev">▾</span></h2>
+        <div class="card-body">
+          <div class="grid2">
+            <label class="field">
+              <span>Fetch mode</span>
+              <select id="mode">
+                <option value="auto" selected>Auto (smart)</option>
+                <option value="http">HTTP (fast)</option>
+                <option value="browser">Browser (render JS)</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Traversal</span>
+              <select id="order">
+                <option value="bfs" selected>Breadth-first</option>
+                <option value="dfs">Depth-first</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Concurrency</span>
+              <input id="concurrency" type="number" value="5" min="1" max="32" />
+            </label>
+            <label class="field">
+              <span>Delay / host (ms)</span>
+              <input id="delay" type="number" value="300" min="0" step="50" />
+            </label>
+            <label class="field">
+              <span>Timeout (ms)</span>
+              <input id="timeout" type="number" value="30000" min="1000" step="1000" />
+            </label>
+            <label class="field">
+              <span>Retries</span>
+              <input id="maxRetries" type="number" value="2" min="0" max="6" />
+            </label>
+          </div>
+          <label class="check"><input type="checkbox" id="jitter" checked /> Randomized delay (jitter)</label>
+        </div>
+      </section>
+
+      <section class="card collapsed" data-card>
+        <h2 class="card-head">③ Scope &amp; limits <span class="chev">▾</span></h2>
+        <div class="card-body">
+          <label class="field">
+            <span>Scope</span>
+            <select id="scope">
+              <option value="domain" selected>Same domain</option>
+              <option value="subdomain">Same domain + subdomains</option>
+              <option value="path">Under seed path</option>
+              <option value="page">Single page</option>
+              <option value="all">Entire web (careful!)</option>
+            </select>
+          </label>
+          <div class="grid2">
+            <label class="field">
+              <span>Max depth <small>(0 = ∞)</small></span>
+              <input id="maxDepth" type="number" value="5" min="0" />
+            </label>
+            <label class="field">
+              <span>Max pages <small>(0 = ∞)</small></span>
+              <input id="maxPages" type="number" value="500" min="0" />
+            </label>
+          </div>
+          <label class="field">
+            <span>Include patterns <small>(regex, one per line)</small></span>
+            <textarea id="includePatterns" rows="2" placeholder="one regex per line"></textarea>
+          </label>
+          <label class="field">
+            <span>Exclude patterns <small>(regex, one per line)</small></span>
+            <textarea id="excludePatterns" rows="2" placeholder="one regex per line"></textarea>
+          </label>
+          <label class="check"><input type="checkbox" id="followSitemaps" checked /> Discover URLs from sitemap.xml</label>
+          <label class="check"><input type="checkbox" id="respectRobots" checked /> Respect robots.txt</label>
+        </div>
+      </section>
+
+      <section class="card collapsed" data-card>
+        <h2 class="card-head">④ Downloads <span class="chev">▾</span></h2>
+        <div class="card-body">
+          <label class="check big"><input type="checkbox" id="downloadAssets" /> Download files / assets</label>
+          <div class="categories" id="categories">
+            <label class="chip all"><input type="checkbox" id="catAll" /> ⭐ All</label>
+            <label class="chip"><input type="checkbox" value="images" checked /> 🖼️ Images</label>
+            <label class="chip"><input type="checkbox" value="media" /> 🎞️ Media</label>
+            <label class="chip"><input type="checkbox" value="documents" /> 📄 Docs</label>
+            <label class="chip"><input type="checkbox" value="archives" /> 🗜️ Archives</label>
+            <label class="chip"><input type="checkbox" value="styles" /> 🎨 CSS</label>
+            <label class="chip"><input type="checkbox" value="scripts" /> 📜 JS</label>
+            <label class="chip"><input type="checkbox" value="fonts" /> 🔤 Fonts</label>
+            <label class="chip"><input type="checkbox" value="data" /> 🧾 Data</label>
+          </div>
+          <div class="grid2">
+            <label class="field">
+              <span>Max file size (MB)<small> 0=∞</small></span>
+              <input id="maxFileSize" type="number" value="50" min="0" />
+            </label>
+            <label class="field">
+              <span>Asset concurrency</span>
+              <input id="assetConcurrency" type="number" value="4" min="1" max="16" />
+            </label>
+          </div>
+          <label class="check"><input type="checkbox" id="savePages" /> Save full HTML mirror (offline copy)</label>
+        </div>
+      </section>
+
+      <section class="card collapsed" data-card>
+        <h2 class="card-head">⑤ Stealth &amp; rendering <span class="chev">▾</span></h2>
+        <div class="card-body">
+          <label class="check"><input type="checkbox" id="rotateUserAgent" /> Rotate user-agent</label>
+          <label class="field">
+            <span>Custom user-agent <small>(optional)</small></span>
+            <input id="userAgent" type="text" placeholder="leave blank for built-in pool" />
+          </label>
+          <div class="grid2">
+            <label class="field">
+              <span>Render windows</span>
+              <input id="renderConcurrency" type="number" value="2" min="1" max="6" />
+            </label>
+            <label class="field">
+              <span>Render settle (ms)</span>
+              <input id="renderSettle" type="number" value="1200" min="0" step="100" />
+            </label>
+          </div>
+          <label class="field">
+            <span>Wait for selector <small>(browser mode)</small></span>
+            <input id="waitSelector" type="text" placeholder="e.g. #content" />
+          </label>
+          <label class="check"><input type="checkbox" id="scrollToBottom" /> Auto-scroll (trigger lazy-load)</label>
+          <label class="check"><input type="checkbox" id="blockTrackers" checked /> Block ads &amp; trackers while rendering</label>
+          <label class="field">
+            <span>Cookie header <small>(optional)</small></span>
+            <input id="cookie" type="text" placeholder="key=value; key2=value2" />
+          </label>
+          <label class="field">
+            <span>Accept-Language</span>
+            <input id="acceptLanguage" type="text" value="en-US,en;q=0.9" />
+          </label>
+        </div>
+      </section>
+
+      <section class="card" id="cardOutput" data-card>
+        <h2 class="card-head">⑥ Output <span class="req">required</span> <span class="chev">▾</span></h2>
+        <div class="card-body">
+          <label class="field">
+            <span>Output folder <small>— where files are saved</small></span>
+            <div class="folder-row">
+              <input id="outputRoot" type="text" placeholder="Choose a folder…" readonly />
+              <button class="ghost small" id="pickFolder" type="button">Browse…</button>
+            </div>
+          </label>
+          <label class="field">
+            <span>Session name <small>(optional)</small></span>
+            <input id="sessionName" type="text" placeholder="auto: host_timestamp" />
+          </label>
+        </div>
+      </section>
+    </aside>
+
+    <!-- ============================ DASHBOARD ============================ -->
+    <section class="dashboard">
+      <div class="controls">
+        <button id="startBtn" class="primary">▶ Start crawl</button>
+        <button id="pauseBtn" class="warn" disabled>⏸ Pause</button>
+        <button id="stopBtn" class="danger" disabled>⏹ Stop</button>
+        <div class="spacer"></div>
+        <div class="export">
+          <span>Export:</span>
+          <button class="ghost small" data-export="json" disabled>JSON</button>
+          <button class="ghost small" data-export="csv" disabled>CSV</button>
+          <button class="ghost small" data-export="ndjson" disabled>NDJSON</button>
+          <button class="ghost small" id="openFolderBtn" disabled>📂 Open folder</button>
+        </div>
+      </div>
+
+      <div class="stats" id="stats">
+        <div class="stat"><span class="num" id="stCrawled">0</span><span class="lbl">Crawled</span></div>
+        <div class="stat"><span class="num" id="stQueued">0</span><span class="lbl">Queued</span></div>
+        <div class="stat"><span class="num" id="stActive">0</span><span class="lbl">Active</span></div>
+        <div class="stat"><span class="num" id="stDownloaded">0</span><span class="lbl">Files</span></div>
+        <div class="stat"><span class="num" id="stBytes">0 B</span><span class="lbl">Data</span></div>
+        <div class="stat"><span class="num" id="stErrors">0</span><span class="lbl">Errors</span></div>
+        <div class="stat"><span class="num" id="stEscalated">0</span><span class="lbl">Escalated</span></div>
+        <div class="stat"><span class="num" id="stElapsed">0s</span><span class="lbl">Elapsed</span></div>
+      </div>
+
+      <div class="status-bar">
+        <span id="statusDot" class="dot idle"></span>
+        <span id="statusText">Idle — configure a crawl and press Start.</span>
+        <div class="progressbar"><div id="progressFill"></div></div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="pages">Pages <span id="pagesCount" class="badge">0</span></button>
+        <button class="tab" data-tab="assets">Assets <span id="assetsCount" class="badge">0</span></button>
+        <button class="tab" data-tab="errors">Errors <span id="errorsCount" class="badge">0</span></button>
+        <button class="tab" data-tab="log">Log</button>
+      </div>
+
+      <div class="tab-body">
+        <div class="tab-pane active" id="tab-pages">
+          <table class="data-table">
+            <thead>
+              <tr><th>#</th><th>Status</th><th>Depth</th><th>Title</th><th>URL</th><th>Type</th><th>Links</th><th>Size</th></tr>
+            </thead>
+            <tbody id="pagesBody"></tbody>
+          </table>
+        </div>
+        <div class="tab-pane" id="tab-assets">
+          <table class="data-table">
+            <thead><tr><th>#</th><th>Category</th><th>URL</th><th>Size</th></tr></thead>
+            <tbody id="assetsBody"></tbody>
+          </table>
+        </div>
+        <div class="tab-pane" id="tab-errors">
+          <table class="data-table">
+            <thead><tr><th>#</th><th>URL</th><th>Message</th></tr></thead>
+            <tbody id="errorsBody"></tbody>
+          </table>
+        </div>
+        <div class="tab-pane" id="tab-log">
+          <pre id="logBox" class="log"></pre>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
