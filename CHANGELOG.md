@@ -8,11 +8,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 - Pause/resume that persists the frontier to disk (resumable crawls across restarts).
-- Proxy support (HTTP/SOCKS) and per-request proxy rotation.
+- Per-request proxy rotation and authenticated proxies.
 - Visual link-graph explorer.
 - Screenshot capture per page.
 - Plugin/hook system for custom extractors.
 - Scheduling (cron-style recurring crawls).
+
+## [1.1.0] — 2026-06-14
+
+### Added — white-hat recon toolkit
+- **Intel extraction** (`Recon.js`): passively harvests emails, phone numbers,
+  secrets / API keys (AWS, Google, Slack, GitHub, Stripe, JWT, private keys,
+  generic), social-media links, API endpoints, and noteworthy HTML comments.
+  Live **Intel tab** + `data/intel.json`. Secrets are masked in the UI/log.
+- **Security & tech audit**: flags missing security headers (CSP, HSTS,
+  X-Frame-Options, …) and insecure cookie flags, and fingerprints the
+  server / framework / CMS. Written to `data/security.json`.
+- **Form enumeration**: every page's forms (action, method, input names/types)
+  captured for attack-surface mapping → `data/forms.json`.
+- **Proxy support**: route all traffic (HTTP **and** browser engine) through an
+  HTTP or SOCKS proxy — e.g. Burp/ZAP (`127.0.0.1:8080`) or Tor
+  (`socks5://127.0.0.1:9050`).
+- **Custom request headers** UI (e.g. `Authorization: Bearer …`).
+- **Discovered-hosts** list in the run summary.
+
+### Changed
+- The HTTP engine now uses Electron's `net.fetch` (Chromium network stack) so it
+  honours the session proxy and cookie jar, and captures response headers.
+- **Downloads UX**: removed the redundant "Download files / assets" master
+  checkbox — downloads now happen when **any** file-type category is selected.
+  Added the **"⭐ All"** toggle that selects/clears every type.
+- Asset downloads check `Content-Length` first and skip oversize files before
+  transferring the body.
+
+### Fixed
+- Two competing "select all" controls in the Downloads panel (the master toggle
+  and the All chip) collapsed into one clear model.
 
 ## [1.0.0] — 2026-06-14
 

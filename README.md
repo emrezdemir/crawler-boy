@@ -57,11 +57,26 @@ would see.
 
 ### Stealth & rendering (white-hat toolbox)
 - Built-in **user-agent pool** with optional rotation.
-- Custom **cookie**, **Accept-Language**, and extra headers.
+- Custom **cookie**, **Accept-Language**, and **custom request headers**
+  (e.g. `Authorization: Bearer …`).
+- **Proxy support** — route *all* traffic (HTTP + browser engine) through an
+  HTTP or SOCKS proxy: Burp/ZAP (`127.0.0.1:8080`) or Tor (`socks5://127.0.0.1:9050`).
 - **Wait-for-selector** and **auto-scroll** to trigger lazy content.
 - **Ad / tracker blocking** during render — faster, quieter, less bandwidth.
 - **Pooled render windows** (reused, not recreated) — stable and fast.
 - Configurable render settle time and parallel render windows.
+
+### Recon & security (passive analysis)
+- **Intel extraction**: emails, phone numbers, **secrets / API keys** (AWS,
+  Google, Slack, GitHub, Stripe, JWT, private keys, generic patterns), social
+  links, **API endpoints**, and noteworthy HTML comments. Live **Intel tab**.
+- **Security audit**: missing security headers (CSP, HSTS, X-Frame-Options, …)
+  and insecure cookie flags.
+- **Tech fingerprinting**: server / framework / CMS detection (WordPress,
+  Next.js, React, Drupal, Cloudflare, …).
+- **Form enumeration**: action, method, and input fields per page — attack-surface
+  mapping.
+- All passive — it only inspects content already fetched; it never attacks.
 
 ### UX
 - Live dashboard: crawled / queued / active / files / data / errors / escalations / elapsed.
@@ -112,6 +127,9 @@ fully-built content comes through.
    ├─ crawl-data.json   pages + summary
    ├─ assets.json       downloaded files index
    ├─ links.json        page → outbound links graph
+   ├─ forms.json        enumerated forms per page
+   ├─ intel.json        emails, secrets, endpoints, socials, comments (if enabled)
+   ├─ security.json     security-header + tech audit (if enabled)
    └─ errors.json       failures
 ```
 
@@ -141,8 +159,9 @@ src/
 │  ├─ preload.js           secure contextBridge API
 │  └─ crawler/
 │     ├─ CrawlEngine.js    orchestrator (worker pool, throttling, events)
-│     ├─ Fetcher.js        HTTP + Chromium render + auto-escalation
-│     ├─ Parser.js         link & asset extraction (cheerio)
+│     ├─ Fetcher.js        HTTP (net.fetch) + Chromium render + auto-escalation + proxy
+│     ├─ Parser.js         link / asset / form extraction (cheerio)
+│     ├─ Recon.js          intel extraction + security & tech audit
 │     ├─ Frontier.js       URL queue + visited set
 │     ├─ RobotsManager.js  robots.txt fetch/parse/evaluate
 │     ├─ Downloader.js     disk layout, asset/page saving, exporters

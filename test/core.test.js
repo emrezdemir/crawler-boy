@@ -6,6 +6,7 @@ const u = require('../src/main/crawler/utils');
 const Frontier = require('../src/main/crawler/Frontier');
 const RobotsManager = require('../src/main/crawler/RobotsManager');
 const { parse } = require('../src/main/crawler/Parser');
+const { extractIntel, auditSecurity } = require('../src/main/crawler/Recon');
 
 let passed = 0;
 const ok = (cond, msg) => { assert(cond, msg); console.log('  ✓', msg); passed++; };
@@ -61,6 +62,32 @@ ok(aset.has('https://s.com/style.css'), 'Parser extracts stylesheet');
 ok(aset.has('https://s.com/app.js'), 'Parser extracts script');
 ok(aset.has('https://s.com/files/doc.pdf'), 'Parser treats .pdf link as document asset');
 ok(r.assets.find(a => a.url === 'https://s.com/v/clip.mp4').type === 'media', 'mp4 categorized as media');
+
+console.log('Parser forms:');
+const fp = parse('<form action="/login" method="POST"><input name="user"><input name="pass" type="password"><button name="go">Go</button></form>', 'https://s.com/');
+ok(fp.forms.length === 1, 'Parser extracts a form');
+ok(fp.forms[0].method === 'post', 'form method captured (lowercased)');
+ok(fp.forms[0].action === 'https://s.com/login', 'form action resolved');
+ok(fp.forms[0].inputs.some(i => i.name === 'pass' && i.type === 'password'), 'form inputs + types captured');
+
+console.log('Recon (intel + security):');
+const intelHtml = `<html><body>
+contact admin@example.com or sales@test.co.uk
+<a href="https://twitter.com/acme">tw</a>
+<script>const k="AKIAIOSFODNN7EXAMPLE"; fetch('/api/v1/users');</script>
+<!-- TODO: remove hardcoded password before launch -->
+</body></html>`;
+const intel = extractIntel(intelHtml, ['https://twitter.com/acme', 'https://example.com/x']);
+ok(intel.emails.includes('admin@example.com'), 'intel finds email');
+ok(intel.secrets.some(s => /AKIA/.test(s.value)), 'intel finds AWS access key');
+ok(intel.socials.some(s => /twitter\.com/.test(s)), 'intel finds social link');
+ok(intel.endpoints.some(e => e.includes('/api/v1/users')), 'intel finds API endpoint');
+ok(intel.comments.some(c => /TODO/i.test(c)), 'intel finds interesting comment');
+const audit = auditSecurity({ server: 'nginx', 'x-powered-by': 'PHP/8.1' }, {}, 'https://x.com/', '<html>wp-content/themes</html>');
+ok(audit.missingHeaders.includes('content-security-policy'), 'audit flags missing CSP');
+ok(audit.https === true, 'audit detects https');
+ok(audit.tech.some(t => /nginx/i.test(t)), 'fingerprint detects server (nginx)');
+ok(audit.tech.includes('WordPress'), 'fingerprint detects WordPress');
 
 console.log('RobotsManager:');
 (async () => {

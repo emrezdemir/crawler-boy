@@ -178,10 +178,10 @@
       <section class="card collapsed" data-card>
         <h2 class="card-head">④ Downloads <span class="chev">▾</span></h2>
         <div class="card-body">
-          <label class="check big"><input type="checkbox" id="downloadAssets" /> Download files / assets</label>
+          <p class="hint">Tick the file types to download. Leave all unchecked to map the site without downloading anything.</p>
           <div class="categories" id="categories">
             <label class="chip all"><input type="checkbox" id="catAll" /> ⭐ All</label>
-            <label class="chip"><input type="checkbox" value="images" checked /> 🖼️ Images</label>
+            <label class="chip"><input type="checkbox" value="images" /> 🖼️ Images</label>
             <label class="chip"><input type="checkbox" value="media" /> 🎞️ Media</label>
             <label class="chip"><input type="checkbox" value="documents" /> 📄 Docs</label>
             <label class="chip"><input type="checkbox" value="archives" /> 🗜️ Archives</label>
@@ -239,8 +239,25 @@
         </div>
       </section>
 
+      <section class="card collapsed" data-card>
+        <h2 class="card-head">⑥ Recon &amp; security <span class="chev">▾</span></h2>
+        <div class="card-body">
+          <label class="check"><input type="checkbox" id="extractIntel" /> Extract intel <small>(emails, keys, endpoints, comments)</small></label>
+          <label class="check"><input type="checkbox" id="auditSecurity" /> Security headers &amp; tech fingerprint audit</label>
+          <label class="field">
+            <span>Proxy <small>— route all traffic through</small></span>
+            <input id="proxy" type="text" placeholder="socks5://127.0.0.1:9050  or  127.0.0.1:8080" />
+          </label>
+          <label class="field">
+            <span>Custom request headers <small>— "Header: value" per line</small></span>
+            <textarea id="extraHeaders" rows="2" placeholder="Authorization: Bearer ...&#10;X-API-Key: ..."></textarea>
+          </label>
+          <p class="hint">⚠️ Passive analysis only. Use exclusively on targets you are authorized to assess.</p>
+        </div>
+      </section>
+
       <section class="card" id="cardOutput" data-card>
-        <h2 class="card-head">⑥ Output <span class="req">required</span> <span class="chev">▾</span></h2>
+        <h2 class="card-head">⑦ Output <span class="req">required</span> <span class="chev">▾</span></h2>
         <div class="card-body">
           <label class="field">
             <span>Output folder <small>— where files are saved</small></span>
@@ -293,6 +310,7 @@
       <div class="tabs">
         <button class="tab active" data-tab="pages">Pages <span id="pagesCount" class="badge">0</span></button>
         <button class="tab" data-tab="assets">Assets <span id="assetsCount" class="badge">0</span></button>
+        <button class="tab" data-tab="intel">Intel <span id="intelCount" class="badge">0</span></button>
         <button class="tab" data-tab="errors">Errors <span id="errorsCount" class="badge">0</span></button>
         <button class="tab" data-tab="log">Log</button>
       </div>
@@ -310,6 +328,12 @@
           <table class="data-table">
             <thead><tr><th>#</th><th>Category</th><th>URL</th><th>Size</th></tr></thead>
             <tbody id="assetsBody"></tbody>
+          </table>
+        </div>
+        <div class="tab-pane" id="tab-intel">
+          <table class="data-table">
+            <thead><tr><th>#</th><th>Type</th><th>Finding</th><th>Source page</th></tr></thead>
+            <tbody id="intelBody"></tbody>
           </table>
         </div>
         <div class="tab-pane" id="tab-errors">

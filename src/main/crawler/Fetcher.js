@@ -2,6 +2,19 @@
 
 const { sleep } = require('./utils');
 
+/** Convert a fetch Headers object into a plain lowercase-keyed object. */
+function headersToObject(h) {
+  const out = {};
+  try {
+    h.forEach((value, key) => {
+      out[key.toLowerCase()] = value;
+    });
+  } catch {
+    /* not iterable */
+  }
+  return out;
+}
+
 /**
  * Fetcher — the network layer with two engines and an auto-escalation strategy.
  *
@@ -83,6 +96,7 @@ class Fetcher {
     this.partition = config.partition || 'persist:crawlerboy';
     this._electron = null;
     this._headersInstalled = false;
+    this._proxyApplied = false;
   }
 
   _ua() {
@@ -117,7 +131,7 @@ class Fetcher {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeout);
     try {
-      const res = await fetch(url, {
+      const res = await this._netFetch(url, {
         method,
         headers: this._baseHeaders(ua),
         redirect: 'follow',
@@ -127,6 +141,47 @@ class Fetcher {
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  /**
+   * Prefer Electron's `net.fetch` (Chromium network stack: honours the session
+   * proxy and cookie jar). Fall back to the global `fetch` when Electron is not
+   * present (e.g. unit tests that exercise the engine directly).
+   */
+  async _netFetch(url, init) {
+    try {
+      const { net } = this._getElectron();
+      if (net && typeof net.fetch === 'function') {
+        await this._ensureProxy();
+        return net.fetch(url, { ...init, session: this._session(), useSessionCookies: true });
+      }
+    } catch {
+      /* electron unavailable → global fetch */
+    }
+    return fetch(url, init);
+  }
+
+  _session() {
+    const { session } = this._getElectron();
+    return session.fromPartition(this.partition);
+  }
+
+  /** Apply the configured proxy to the shared session once (Burp/ZAP/Tor/etc.). */
+  async _ensureProxy() {
+    if (this._proxyApplied) return;
+    this._proxyApplied = true;
+    if (!this.config.proxy) return;
+    try {
+      await this._session().setProxy({ proxyRules: this._proxyRules(this.config.proxy) });
+    } catch {
+      /* malformed proxy → fall back to a direct connection */
+    }
+  }
+
+  _proxyRules(proxy) {
+    const p = String(proxy).trim();
+    if (/^socks/i.test(p)) return p; // e.g. socks5://127.0.0.1:9050
+    return p.replace(/^https?:\/\//i, ''); // host:port → applies to http + https
   }
 
   /** Fetch a page as HTML via HTTP. */
@@ -143,6 +198,7 @@ class Fetcher {
         status: res.status,
         finalUrl,
         contentType,
+        headers: headersToObject(res.headers),
         html,
         renderedWith: 'http',
       };
@@ -170,14 +226,24 @@ class Fetcher {
     }
   }
 
-  /** Download a binary resource. Returns a Buffer payload + metadata. */
-  async fetchBinary(url) {
+  /**
+   * Download a binary resource. Returns a Buffer payload + metadata.
+   * @param {number} [maxBytes] reject (without reading the body) when the
+   *        Content-Length exceeds this, to avoid wasting bandwidth.
+   */
+  async fetchBinary(url, maxBytes = 0) {
     try {
       const { res } = await this._httpFetch(url);
       const contentType = res.headers.get('content-type') || '';
       const finalUrl = res.url || url;
       if (!res.ok) {
         return { ok: false, status: res.status, finalUrl, contentType, buffer: null };
+      }
+      if (maxBytes) {
+        const declared = parseInt(res.headers.get('content-length') || '0', 10);
+        if (declared && declared > maxBytes) {
+          return { ok: false, status: res.status, finalUrl, contentType, buffer: null, tooLarge: true, bytes: declared };
+        }
       }
       const arr = await res.arrayBuffer();
       return {
@@ -315,6 +381,7 @@ class Fetcher {
 
   async fetchPageBrowser(url) {
     const ua = this._ua();
+    await this._ensureProxy();
     const win = await this._acquireWindow();
     if (!win) {
       return { ok: false, status: 0, finalUrl: url, contentType: '', html: '', error: 'no-window', renderedWith: 'browser' };
@@ -461,6 +528,10 @@ class Fetcher {
     if (!this._looksBlocked(httpResult)) return httpResult;
     const browserResult = await this.fetchPageBrowser(url);
     browserResult.escalated = true;
+    browserResult.httpStatus = httpResult.status;
+    // Keep the original response headers so security/tech audits still work even
+    // though the body came from the rendered DOM.
+    if (!browserResult.headers && httpResult.headers) browserResult.headers = httpResult.headers;
     return browserResult;
   }
 

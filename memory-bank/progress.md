@@ -2,6 +2,20 @@
 
 _Last updated: 2026-06-14_
 
+## ✅ Done (v1.1.0 — white-hat recon update)
+- [x] `Recon.js`: intel extraction (emails, phones, secrets/API keys, socials,
+      endpoints, comments) + security-header audit + tech fingerprinting.
+- [x] Form enumeration in `Parser` (`forms.json`).
+- [x] **Proxy** (HTTP/SOCKS) for HTTP + browser engines; HTTP now via Electron
+      `net.fetch` (Chromium stack → proxy/cookies/response headers).
+- [x] Custom request headers UI; discovered-hosts in summary.
+- [x] UI: removed the redundant "Download files" master toggle (now any selected
+      category = download); "⭐ All" categories toggle; new **Intel** tab;
+      `data/intel.json`, `data/security.json`, `data/forms.json`.
+- [x] Asset `Content-Length` pre-check before downloading oversize files.
+- [x] Tests extended (49 assertions incl. Recon + forms); live Fandom run found
+      265 intel rows, 863 endpoints, 1 email.
+
 ## ✅ Done (v1.0.0)
 
 ### Engine

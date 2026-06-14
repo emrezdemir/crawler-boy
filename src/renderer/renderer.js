@@ -14,6 +14,7 @@ const els = {
   pagesBody: $('pagesBody'),
   assetsBody: $('assetsBody'),
   errorsBody: $('errorsBody'),
+  intelBody: $('intelBody'),
   logBox: $('logBox'),
   statusDot: $('statusDot'),
   statusText: $('statusText'),
@@ -23,6 +24,8 @@ const els = {
 let pageRows = 0;
 let assetRows = 0;
 let errorRows = 0;
+let intelRows = 0;
+const intelSeen = new Set();
 let running = false;
 let paused = false;
 let sessionDir = null;
@@ -38,7 +41,9 @@ function gatherConfig() {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const categories = [...document.querySelectorAll('#categories input:checked')].map((c) => c.value);
+  const categories = [...document.querySelectorAll('#categories input:checked')]
+    .filter((c) => c.id !== 'catAll')
+    .map((c) => c.value);
 
   return {
     seedUrls,
@@ -57,7 +62,8 @@ function gatherConfig() {
     excludePatterns: $('excludePatterns').value,
     followSitemaps: $('followSitemaps').checked,
     respectRobots: $('respectRobots').checked,
-    downloadAssets: $('downloadAssets').checked,
+    // Downloads happen whenever at least one file type is selected.
+    downloadAssets: categories.length > 0,
     categories,
     maxFileSize: int($('maxFileSize').value, 0) * 1024 * 1024,
     assetConcurrency: int($('assetConcurrency').value, 4),
@@ -71,9 +77,28 @@ function gatherConfig() {
     blockTrackers: $('blockTrackers').checked,
     cookie: $('cookie').value.trim() || undefined,
     acceptLanguage: $('acceptLanguage').value.trim() || 'en-US,en;q=0.9',
+    // Recon & security
+    extractIntel: $('extractIntel').checked,
+    auditSecurity: $('auditSecurity').checked,
+    proxy: $('proxy').value.trim() || undefined,
+    extraHeaders: parseHeaders($('extraHeaders').value),
     outputRoot: $('outputRoot').value.trim() || undefined,
     sessionName: $('sessionName').value.trim() || undefined,
   };
+}
+
+/** Parse "Header: value" lines into an object (empty → undefined). */
+function parseHeaders(raw) {
+  const out = {};
+  for (const line of String(raw || '').split(/\n+/)) {
+    const i = line.indexOf(':');
+    if (i > 0) {
+      const k = line.slice(0, i).trim();
+      const v = line.slice(i + 1).trim();
+      if (k && v) out[k] = v;
+    }
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 const int = (v, d) => {
@@ -90,9 +115,7 @@ function validate(cfg) {
   for (const u of cfg.seedUrls) {
     if (!/^https?:\/\//i.test(u)) return `Seed URLs must start with http(s):// — got "${u}"`;
   }
-  if (!cfg.outputRoot) return 'Please choose an output folder first (⑥ Output → Browse…).';
-  if (cfg.downloadAssets && !cfg.categories.length)
-    return 'Enable at least one file category, or turn off "Download files".';
+  if (!cfg.outputRoot) return 'Please choose an output folder first (⑦ Output → Browse…).';
   return null;
 }
 
@@ -174,12 +197,10 @@ const catBoxes = () =>
   [...document.querySelectorAll('#categories input[type="checkbox"]')].filter((c) => c.id !== 'catAll');
 catAll.addEventListener('change', () => {
   catBoxes().forEach((c) => (c.checked = catAll.checked));
-  if (catAll.checked) $('downloadAssets').checked = true;
 });
 catBoxes().forEach((c) =>
   c.addEventListener('change', () => {
     catAll.checked = catBoxes().every((b) => b.checked);
-    if (c.checked) $('downloadAssets').checked = true;
   })
 );
 
@@ -241,6 +262,9 @@ window.crawler.onEvent(({ type, data }) => {
       break;
     case 'asset':
       addAssetRow(data);
+      break;
+    case 'intel':
+      addIntelRows(data);
       break;
     case 'error':
       addErrorRow(data);
@@ -344,6 +368,25 @@ function addErrorRow(e) {
   els.errorsBody.appendChild(tr);
 }
 
+function addIntelRows({ rows }) {
+  for (const r of rows || []) {
+    const key = `${r.kind}|${r.value}`;
+    if (intelSeen.has(key)) continue;
+    intelSeen.add(key);
+    intelRows++;
+    $('intelCount').textContent = intelRows;
+    if (intelRows > MAX_TABLE_ROWS) continue;
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      `<td>${intelRows}</td>` +
+      `<td><span class="kind kind-${escapeHtml(r.kind)}">${escapeHtml(r.kind)}</span></td>` +
+      `<td>${escapeHtml(truncate(r.value, 90))}</td>` +
+      `<td class="u" title="${escapeAttr(r.page)}">${escapeHtml(truncate(r.page, 50))}</td>`;
+    bindOpen(tr.querySelector('.u'), r.page);
+    els.intelBody.appendChild(tr);
+  }
+}
+
 function appendLog(level, message, ts) {
   const time = new Date(ts || Date.now()).toLocaleTimeString();
   const line = document.createElement('span');
@@ -387,14 +430,17 @@ function setStatus(state, text) {
 }
 
 function resetUI() {
-  pageRows = assetRows = errorRows = 0;
+  pageRows = assetRows = errorRows = intelRows = 0;
+  intelSeen.clear();
   els.pagesBody.innerHTML = '';
   els.assetsBody.innerHTML = '';
   els.errorsBody.innerHTML = '';
+  els.intelBody.innerHTML = '';
   els.logBox.innerHTML = '';
   $('pagesCount').textContent = '0';
   $('assetsCount').textContent = '0';
   $('errorsCount').textContent = '0';
+  $('intelCount').textContent = '0';
   els.progressFill.style.width = '0';
   document.querySelectorAll('[data-export]').forEach((b) => (b.disabled = true));
   els.openFolder.disabled = true;

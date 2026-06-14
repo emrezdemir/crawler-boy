@@ -25,7 +25,7 @@ CrawlerBoy/
 ├─ package.json            scripts + electron-builder config
 ├─ assets/                 icon.png (+ generate-icon.js, dependency-free)
 ├─ src/
-│  ├─ main/                main.js, preload.js, crawler/*
+│  ├─ main/                main.js, preload.js, crawler/* (incl. Recon.js)
 │  └─ renderer/            index.html, styles.css, renderer.js
 ├─ memory-bank/            this folder
 ├─ README.md  CHANGELOG.md  GRAND_RULES.md  CONTRIBUTING.md  LICENSE

@@ -4,9 +4,11 @@ _Last updated: 2026-06-14_
 
 ## Current focus
 
-**v1.0.0 — initial build complete.** The full crawler app exists end to end:
-engine, fetcher (HTTP/browser/auto), robots, parser, downloader, IPC, and the
-dashboard UI. Documentation and governance are in place.
+**v1.1.0 — white-hat recon update shipped.** On top of the v1.0.0 crawler we
+added a passive recon layer (`Recon.js`: intel/secrets/endpoints + security &
+tech audit), form enumeration, proxy support (HTTP/SOCKS, via Electron
+`net.fetch`), custom headers, an Intel tab, and a cleaner Downloads UX (no more
+double "All"). All verified live against the original Fandom target.
 
 ## What just happened
 

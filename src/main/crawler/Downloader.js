@@ -70,10 +70,14 @@ class Downloader {
     if (!this.wantsCategory(type)) return { status: 'skipped', reason: 'category-off' };
     this.downloaded.add(url);
 
-    const result = await this.fetcher.fetchBinary(url);
+    const result = await this.fetcher.fetchBinary(url, this.maxFileSize);
+    if (result.tooLarge) {
+      return { status: 'skipped', reason: 'too-large', bytes: result.bytes };
+    }
     if (!result.ok || !result.buffer) {
       return { status: 'error', reason: result.error || `http-${result.status}` };
     }
+    // Fallback guard for servers that don't send Content-Length.
     if (this.maxFileSize && result.buffer.length > this.maxFileSize) {
       return { status: 'skipped', reason: 'too-large', bytes: result.buffer.length };
     }
@@ -92,18 +96,30 @@ class Downloader {
   }
 
   /** Write the structured crawl results to data/. */
-  async writeResults({ pages, assets, errors, summary }) {
+  async writeResults({ pages, assets, errors, intel, security, summary }) {
     const dataDir = path.join(this.sessionDir, 'data');
     await fsp.mkdir(dataDir, { recursive: true });
     const writeJson = (name, obj) =>
       fsp.writeFile(path.join(dataDir, name), JSON.stringify(obj, null, 2), 'utf8');
 
-    await Promise.all([
+    const jobs = [
       writeJson('crawl-data.json', { summary, pages }),
       writeJson('assets.json', assets),
       writeJson('errors.json', errors),
       writeJson('links.json', this._buildLinkGraph(pages)),
-    ]);
+      writeJson('forms.json', this._collectForms(pages)),
+    ];
+    if (intel) jobs.push(writeJson('intel.json', intel));
+    if (security && security.length) jobs.push(writeJson('security.json', security));
+    await Promise.all(jobs);
+  }
+
+  _collectForms(pages) {
+    const out = [];
+    for (const p of pages) {
+      if (p.forms && p.forms.length) out.push({ page: p.finalUrl || p.url, forms: p.forms });
+    }
+    return out;
   }
 
   _buildLinkGraph(pages) {

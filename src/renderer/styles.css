@@ -183,6 +183,16 @@ button.danger { background: var(--accent); border-color: var(--accent); color: #
 .log .l-error { color: var(--accent-soft); }
 .log .t { color: #5b6673; }
 
+.hint { font-size: 11px; color: var(--text-dim); margin: 0 0 8px; line-height: 1.5; }
+
+/* Intel finding type badges */
+.kind { font-size: 10px; border-radius: 5px; padding: 1px 7px; font-weight: 600; text-transform: uppercase; }
+.kind-email { background: #13301f; color: #6ee7a8; }
+.kind-secret { background: #3a1113; color: #ff8d92; }
+.kind-endpoint { background: #10243f; color: #79b8ff; }
+.kind-social { background: #241a3a; color: #c4a7ff; }
+.kind-phone { background: #2a2410; color: #e8c766; }
+
 /* ---------------- Collapsible cards ---------------- */
 .card-head {
   margin: 0; display: flex; align-items: center; justify-content: space-between;

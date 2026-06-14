@@ -8,6 +8,7 @@ const RobotsManager = require('./RobotsManager');
 const Downloader = require('./Downloader');
 const { Fetcher } = require('./Fetcher');
 const { parse } = require('./Parser');
+const { extractIntel, auditSecurity } = require('./Recon');
 const {
   sleep,
   normalizeUrl,
@@ -36,13 +37,19 @@ class Pool {
   }
 }
 
+/** Mask a secret value for display/logging while keeping it recognizable. */
+function maskSecret(v) {
+  const s = String(v);
+  return s.length > 10 ? `${s.slice(0, 4)}…${s.slice(-3)}` : '***';
+}
+
 /**
  * CrawlEngine — the orchestrator. Drives a worker pool over the URL frontier,
  * applying scope / robots / pattern filters, rendering each page, extracting
  * links + assets, downloading enabled file types, and emitting live events.
  *
  * Events: 'started' | 'log' | 'page' | 'asset' | 'stats' | 'error'
- *         | 'state' | 'done'
+ *         | 'intel' | 'state' | 'done'
  */
 class CrawlEngine extends EventEmitter {
   constructor(config) {
@@ -85,6 +92,16 @@ class CrawlEngine extends EventEmitter {
     this.pages = [];
     this.assetRecords = [];
     this.errors = [];
+    this.hosts = new Set();
+    this.security = []; // per-page security audit records
+    this.intel = {
+      emails: new Set(),
+      phones: new Set(),
+      socials: new Set(),
+      endpoints: new Set(),
+      secrets: [], // {type, value, page}
+      comments: [], // {comment, page}
+    };
     this.stats = {
       crawled: 0,
       queued: 0,
@@ -97,6 +114,9 @@ class CrawlEngine extends EventEmitter {
       blockedByRobots: 0,
       outOfScope: 0,
       filtered: 0,
+      forms: 0,
+      secrets: 0,
+      emails: 0,
       elapsedMs: 0,
     };
   }
@@ -164,24 +184,50 @@ class CrawlEngine extends EventEmitter {
     }
   }
 
+  _intelReport() {
+    return {
+      emails: [...this.intel.emails],
+      phones: [...this.intel.phones],
+      socials: [...this.intel.socials],
+      endpoints: [...this.intel.endpoints],
+      secrets: this.intel.secrets,
+      comments: this.intel.comments,
+    };
+  }
+
   async _finalize() {
     this._emitStats();
+    const intel = this._intelReport();
     const summary = {
       ...this.stats,
       seeds: this.seeds,
+      hosts: [...this.hosts],
       finishedAt: Date.now(),
       state: this.state,
       humanBytes: formatBytes(this.stats.pageBytes + this.stats.downloadedBytes),
+      intelCounts: {
+        emails: intel.emails.length,
+        phones: intel.phones.length,
+        socials: intel.socials.length,
+        endpoints: intel.endpoints.length,
+        secrets: intel.secrets.length,
+        comments: intel.comments.length,
+      },
     };
     try {
       await this.downloader.writeResults({
         pages: this.pages,
         assets: this.assetRecords,
         errors: this.errors,
+        intel,
+        security: this.security,
         summary,
       });
     } catch (err) {
       this.log(`Failed to write results: ${err.message}`, 'error');
+    }
+    if (intel.secrets.length) {
+      this.log(`Recon: ${intel.emails.length} email(s), ${intel.endpoints.length} endpoint(s), ${intel.secrets.length} potential secret(s).`, 'warn');
     }
     try {
       this.fetcher.dispose();
@@ -252,6 +298,44 @@ class CrawlEngine extends EventEmitter {
     return true;
   }
 
+  _collectIntel(html, links, page, record) {
+    const found = extractIntel(html, links);
+    const newRows = [];
+    const addSet = (set, arr, kind, cap = Infinity) => {
+      for (const v of arr) {
+        if (set.size >= cap) break;
+        if (!set.has(v)) {
+          set.add(v);
+          newRows.push({ kind, value: v, page });
+        }
+      }
+    };
+    addSet(this.intel.emails, found.emails, 'email');
+    addSet(this.intel.phones, found.phones, 'phone');
+    addSet(this.intel.socials, found.socials, 'social');
+    addSet(this.intel.endpoints, found.endpoints, 'endpoint', 20000);
+    for (const s of found.secrets) {
+      if (this.intel.secrets.length >= 5000) break;
+      this.intel.secrets.push({ ...s, page });
+      newRows.push({ kind: 'secret', value: `[${s.type}] ${maskSecret(s.value)}`, page });
+    }
+    for (const c of found.comments) {
+      if (this.intel.comments.length >= 5000) break;
+      this.intel.comments.push({ comment: c, page });
+    }
+    this.stats.emails = this.intel.emails.size;
+    this.stats.secrets = this.intel.secrets.length;
+    record.intel = {
+      emails: found.emails.length,
+      secrets: found.secrets.length,
+      endpoints: found.endpoints.length,
+    };
+    if (found.secrets.length) {
+      this.log(`⚠ ${found.secrets.length} potential secret(s) found on ${page}`, 'warn');
+    }
+    if (newRows.length) this.emit('intel', { page, rows: newRows.slice(0, 200) });
+  }
+
   async _process(item) {
     const { url, depth } = item;
     const seed = this.seeds[0];
@@ -286,7 +370,7 @@ class CrawlEngine extends EventEmitter {
     }
 
     const finalUrl = normalizeUrl(result.finalUrl) || url;
-    let parsed = { meta: {}, links: [], assets: [] };
+    let parsed = { meta: {}, links: [], assets: [], forms: [] };
     const isHtml = /html|xml/i.test(result.contentType) || !result.contentType;
     if (isHtml && result.html) {
       parsed = parse(result.html, finalUrl);
@@ -338,6 +422,24 @@ class CrawlEngine extends EventEmitter {
       }
     }
     record.links = inScopeLinks;
+    record.forms = parsed.forms;
+    this.stats.forms += parsed.forms.length;
+    this.hosts.add(host);
+
+    // Passive recon — intel extraction + security/tech audit (opt-in).
+    if (this.config.extractIntel && isHtml && result.html) {
+      this._collectIntel(result.html, parsed.links, finalUrl, record);
+    }
+    if (this.config.auditSecurity && isHtml) {
+      const audit = auditSecurity(result.headers || {}, parsed.meta, finalUrl, result.html || '');
+      this.security.push(audit);
+      record.security = {
+        missing: audit.missingHeaders,
+        tech: audit.tech,
+        cookieIssues: audit.cookieIssues,
+      };
+    }
+
     this.pages.push(record);
     this.emit('page', record);
 

@@ -29,8 +29,32 @@ function extractMeta($, baseUrl) {
     ogType: get('meta[property="og:type"]'),
     ogImage: get('meta[property="og:image"]'),
     robotsMeta: get('meta[name="robots"]'),
+    generator: get('meta[name="generator"]'),
     charset: ($('meta[charset]').attr('charset') || '').trim(),
   };
+}
+
+/** Enumerate forms (action, method, inputs) — useful for attack-surface maps. */
+function extractForms($, baseUrl) {
+  const forms = [];
+  $('form').each((_, el) => {
+    const $f = $(el);
+    const action = $f.attr('action');
+    const inputs = [];
+    $f.find('input, select, textarea, button').each((__, i) => {
+      const $i = $(i);
+      const name = $i.attr('name');
+      if (!name) return;
+      inputs.push({ name, type: ($i.attr('type') || $i.get(0).tagName || '').toLowerCase() });
+    });
+    forms.push({
+      action: action ? normalizeUrl(action, baseUrl) || action : baseUrl,
+      method: ($f.attr('method') || 'get').toLowerCase(),
+      inputs,
+    });
+    return forms.length < 100; // cap per page
+  });
+  return forms;
 }
 
 function pushUnique(map, url, type, attrOrigin) {
@@ -150,6 +174,7 @@ function parse(html, baseUrl) {
     meta,
     links: Array.from(links),
     assets: Array.from(assets.values()),
+    forms: extractForms($, effectiveBase),
   };
 }
 

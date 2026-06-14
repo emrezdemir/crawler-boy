@@ -38,6 +38,14 @@ You agree to use CrawlerBoy lawfully and in good faith. In particular, you will:
 - Comply with all applicable local, national, and international laws and
   regulations, including those governing data protection and copyright.
 
+**On the recon / intel features:** CrawlerBoy can passively surface information
+already present in fetched pages (emails, endpoints, possible secrets, security
+headers, technology fingerprints, forms). This is **passive analysis only** — it
+sends no attacks and probes nothing. Use it **exclusively on systems you own or
+are explicitly authorized to assess**. If you discover exposed secrets or
+vulnerabilities, handle them responsibly (e.g. coordinated disclosure) and never
+exploit, retain, or share them unlawfully.
+
 ## 5. Prohibited use
 
 You will **not** use CrawlerBoy to:

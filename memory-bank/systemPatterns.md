@@ -66,6 +66,20 @@ download concurrency pool, dedupe set.
 Bad URLs, malformed HTML, missing robots.txt, failed downloads → recorded as
 errors and the crawl continues. One bad page never kills a run.
 
+### 9. HTTP via Electron `net.fetch`, not global fetch
+The HTTP engine routes through Chromium's network stack (`net.fetch` with the
+crawl's session). This gives us one place where the **proxy** (`session.setProxy`)
+and **cookie jar** apply to both engines, plus real response headers for the
+security audit. Falls back to global `fetch` when Electron is absent (tests).
+
+### 10. Passive recon is a separate, opt-in layer (`Recon.js`)
+Intel extraction, security-header auditing, and tech fingerprinting are pure
+functions over already-fetched content — no extra requests, no probing. They are
+opt-in (off by default), bounded (caps on each finding set), and secrets are
+masked in the UI/log while the full values land only in the local
+`data/intel.json`. This keeps the tool firmly white-hat: it observes, it does not
+attack.
+
 ## Security posture
 
 - `contextIsolation: true`, `nodeIntegration: false`, sandboxed renderer.

@@ -37,16 +37,20 @@ app.whenReady().then(async () => {
     followSitemaps: false, respectRobots: true,
     downloadAssets: true, categories: ['images'], maxFileSize: 5 * 1024 * 1024, assetConcurrency: 4,
     renderConcurrency: 2, renderSettle: 1000, blockTrackers: true,
+    extractIntel: true, auditSecurity: true,
     sessionDir,
   });
 
   let assetCount = 0;
-  engine.on('page', (p) => console.log(`  PAGE [${p.status}] depth=${p.depth} via=${p.renderedWith} bytes=${p.bytes} links=${p.links.length} :: ${(p.meta.title || '').slice(0, 50)}`));
+  let intelCount = 0;
+  engine.on('page', (p) => console.log(`  PAGE [${p.status}] depth=${p.depth} via=${p.renderedWith} bytes=${p.bytes} links=${p.links.length} forms=${(p.forms||[]).length} :: ${(p.meta.title || '').slice(0, 45)}`));
   engine.on('asset', () => assetCount++);
+  engine.on('intel', (d) => { intelCount += d.rows.length; });
   engine.on('log', (l) => { if (l.level !== 'info') console.log(`  [${l.level}] ${l.message}`); });
   engine.on('done', ({ summary }) => {
     console.log('\n=== DONE ===');
     console.log(`crawled: ${summary.crawled} | escalated: ${summary.escalated} | downloaded: ${summary.downloaded} | errors: ${summary.errors} | data: ${summary.humanBytes}`);
+    console.log(`recon: hosts=${(summary.hosts||[]).length} forms=${summary.forms} intel-rows=${intelCount} emails=${summary.intelCounts.emails} endpoints=${summary.intelCounts.endpoints} secrets=${summary.intelCounts.secrets}`);
     const pass = summary.crawled >= 1;
     console.log('VERDICT:', pass ? 'PASS ✅' : 'FAIL ❌');
     clearTimeout(hardTimer);

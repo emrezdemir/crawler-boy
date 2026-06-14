@@ -64,7 +64,7 @@ function send(channel, payload) {
 }
 
 function wireEngine(engine) {
-  for (const evt of ['started', 'log', 'page', 'asset', 'stats', 'error', 'state', 'done']) {
+  for (const evt of ['started', 'log', 'page', 'asset', 'stats', 'error', 'intel', 'state', 'done']) {
     engine.on(evt, (data) => send('crawl:event', { type: evt, data }));
   }
   engine.on('done', ({ summary }) => {
@@ -73,6 +73,8 @@ function wireEngine(engine) {
       pages: engine.pages,
       assets: engine.assetRecords,
       errors: engine.errors,
+      intel: engine._intelReport(),
+      security: engine.security,
     };
     activeEngine = null;
   });
