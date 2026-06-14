@@ -129,6 +129,36 @@ const CONTENT_TYPE_EXT = {
   'font/woff': 'woff', 'font/ttf': 'ttf', 'application/zip': 'zip', 'application/gzip': 'gz',
 };
 
+/**
+ * Sniff a buffer's real type from its magic bytes. Returns a short tag
+ * ('png','jpg','gif','webp','bmp','ico','pdf','zip','gzip','mp4','html','xml')
+ * or '' if unrecognized. Used to verify downloads actually contain what their
+ * URL/category claims (e.g. a wiki "File:" page saved as a .jpg is really HTML).
+ */
+function sniffBinaryType(buffer) {
+  if (!buffer || buffer.length < 4) return '';
+  const b = buffer;
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'png';
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'jpg';
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return 'gif';
+  if (
+    b.length >= 12 &&
+    b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
+    b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50
+  ) return 'webp';
+  if (b[0] === 0x42 && b[1] === 0x4d) return 'bmp';
+  if (b[0] === 0x00 && b[1] === 0x00 && b[2] === 0x01 && b[3] === 0x00) return 'ico';
+  if (b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46) return 'pdf';
+  if (b[0] === 0x50 && b[1] === 0x4b && (b[2] === 0x03 || b[2] === 0x05 || b[2] === 0x07)) return 'zip';
+  if (b[0] === 0x1f && b[1] === 0x8b) return 'gzip';
+  if (b.length >= 12 && b.slice(4, 8).toString('latin1') === 'ftyp') return 'mp4';
+  const head = b.slice(0, 256).toString('latin1').toLowerCase().replace(/^﻿/, '').trimStart();
+  if (head.startsWith('<svg') || (head.startsWith('<?xml') && head.includes('<svg'))) return 'svg';
+  if (head.startsWith('<?xml')) return 'xml';
+  if (head.startsWith('<!doctype html') || head.startsWith('<html') || head.startsWith('<head') || head.startsWith('<body')) return 'html';
+  return '';
+}
+
 /** Best-effort extension (no dot) from a Content-Type header. '' if unknown. */
 function extFromContentType(contentType) {
   if (!contentType) return '';
@@ -260,6 +290,7 @@ module.exports = {
   EXT_TO_CATEGORY,
   extOf,
   extFromContentType,
+  sniffBinaryType,
   categoryOf,
   safeName,
   formatBytes,

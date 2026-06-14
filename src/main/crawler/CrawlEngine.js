@@ -229,6 +229,8 @@ class CrawlEngine extends EventEmitter {
         security: this.security,
         summary,
       });
+      await this.downloader.finishFileList();
+      await this.downloader.writeSummaryText(summary);
     } catch (err) {
       this.log(`Failed to write results: ${err.message}`, 'error');
     }

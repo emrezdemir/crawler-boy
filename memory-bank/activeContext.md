@@ -4,6 +4,14 @@ _Last updated: 2026-06-14_
 
 ## Current focus
 
+**v1.4.0 — integrity, memory, screenshots.** A user got unopenable downloads
+("format not supported") — they were HTML `File:` pages saved as images, or real
+images saved without an extension. Fixed with magic-byte sniffing
+(`utils.sniffBinaryType`): reject HTML-as-binary, and always assign the correct
+extension. Also: rolling-window UI tables (flat renderer memory; full lists go to
+`downloaded-files.txt` + `summary.txt`), README screenshots, and we now tag each
+release.
+
 **v1.3.0 — download organization.** Added an optional "group files into a folder
 per type" toggle (`assets/png/`, `assets/jpg/`, …) for grab-all-the-images style
 runs; default stays the site-mirror layout. (`Downloader._extensionPath`.)

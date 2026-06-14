@@ -29,7 +29,22 @@ const intelSeen = new Set();
 let running = false;
 let paused = false;
 let sessionDir = null;
-const MAX_TABLE_ROWS = 3000; // cap DOM size; counters stay accurate
+// Live tables keep only as many rows as comfortably fit the window — older rows
+// are dropped from the DOM (the full list is saved to disk: data/*.json and
+// downloaded-files.txt). This keeps renderer memory flat no matter how large the
+// crawl gets. Counters/badges always show the true total.
+let LIVE_ROW_CAP = computeLiveCap();
+function computeLiveCap() {
+  const body = document.querySelector('.tab-body');
+  const h = body ? body.clientHeight : window.innerHeight;
+  return Math.max(20, Math.floor((h - 36) / 26)); // ~26px per row, minus header
+}
+window.addEventListener('resize', () => {
+  LIVE_ROW_CAP = computeLiveCap();
+});
+function trimRows(tbody) {
+  while (tbody.childElementCount > LIVE_ROW_CAP) tbody.removeChild(tbody.firstChild);
+}
 
 // ---------------------------------------------------------------------------
 // Config gathering
@@ -325,7 +340,6 @@ function statusClass(status) {
 function addPageRow(p) {
   pageRows++;
   $('pagesCount').textContent = pageRows;
-  if (pageRows > MAX_TABLE_ROWS) return;
   const tr = document.createElement('tr');
   const title = (p.meta && p.meta.title) || '—';
   tr.innerHTML =
@@ -339,13 +353,13 @@ function addPageRow(p) {
     `<td>${formatBytes(p.bytes || 0)}</td>`;
   bindOpen(tr.querySelector('.u'), p.finalUrl || p.url);
   els.pagesBody.appendChild(tr);
+  trimRows(els.pagesBody);
   autoScrollTable(els.pagesBody);
 }
 
 function addAssetRow(a) {
   assetRows++;
   $('assetsCount').textContent = assetRows;
-  if (assetRows > MAX_TABLE_ROWS) return;
   const tr = document.createElement('tr');
   tr.innerHTML =
     `<td>${assetRows}</td>` +
@@ -354,13 +368,13 @@ function addAssetRow(a) {
     `<td>${formatBytes(a.bytes || 0)}</td>`;
   bindOpen(tr.querySelector('.u'), a.url);
   els.assetsBody.appendChild(tr);
+  trimRows(els.assetsBody);
   autoScrollTable(els.assetsBody);
 }
 
 function addErrorRow(e) {
   errorRows++;
   $('errorsCount').textContent = errorRows;
-  if (errorRows > MAX_TABLE_ROWS) return;
   const tr = document.createElement('tr');
   tr.innerHTML =
     `<td>${errorRows}</td>` +
@@ -368,6 +382,7 @@ function addErrorRow(e) {
     `<td class="s-err">${escapeHtml(e.message || '')}</td>`;
   if (e.url) bindOpen(tr.querySelector('.u'), e.url);
   els.errorsBody.appendChild(tr);
+  trimRows(els.errorsBody);
 }
 
 function addIntelRows({ rows }) {
@@ -377,7 +392,6 @@ function addIntelRows({ rows }) {
     intelSeen.add(key);
     intelRows++;
     $('intelCount').textContent = intelRows;
-    if (intelRows > MAX_TABLE_ROWS) continue;
     const tr = document.createElement('tr');
     tr.innerHTML =
       `<td>${intelRows}</td>` +
@@ -386,6 +400,7 @@ function addIntelRows({ rows }) {
       `<td class="u" title="${escapeAttr(r.page)}">${escapeHtml(truncate(r.page, 50))}</td>`;
     bindOpen(tr.querySelector('.u'), r.page);
     els.intelBody.appendChild(tr);
+    trimRows(els.intelBody);
   }
 }
 

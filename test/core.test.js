@@ -28,6 +28,11 @@ ok(u.isTracker('https://static.wikia.nocookie.net/img/x.png') === false, 'isTrac
 ok(u.extFromContentType('image/png; charset=binary') === 'png', 'extFromContentType maps image/png');
 ok(u.extFromContentType('application/pdf') === 'pdf', 'extFromContentType maps pdf');
 ok(u.extFromContentType('') === '', 'extFromContentType empty for none');
+ok(u.sniffBinaryType(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0])) === 'png', 'sniff PNG magic');
+ok(u.sniffBinaryType(Buffer.from([0xff, 0xd8, 0xff, 0xe0])) === 'jpg', 'sniff JPG magic');
+ok(u.sniffBinaryType(Buffer.from('%PDF-1.4 ')) === 'pdf', 'sniff PDF magic');
+ok(u.sniffBinaryType(Buffer.from('<!DOCTYPE html><html><body>x')) === 'html', 'sniff HTML');
+ok(u.sniffBinaryType(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg">')) === 'svg', 'sniff SVG');
 
 console.log('Frontier:');
 const f = new Frontier({ order: 'bfs' });
@@ -135,6 +140,17 @@ console.log('RobotsManager:');
   ));
   ok(many.every((m) => m.links.length === 1), 'pool: handles concurrent tasks');
   await pool.destroy();
+
+  console.log('Downloader (integrity):');
+  const htmlFetcher = {
+    fetchBinary: async () => ({
+      ok: true, status: 200, contentType: 'text/html; charset=utf-8',
+      buffer: Buffer.from('<!DOCTYPE html><html><body>File description page</body></html>'),
+    }),
+  };
+  const dlGuard = new Downloader({ sessionDir: '/tmp/cb-integrity', fetcher: htmlFetcher, categories: new Set(['images']) });
+  const guard = await dlGuard.downloadAsset({ url: 'https://x.com/wiki/File:Foo.jpg', type: 'images' });
+  ok(guard.status === 'skipped' && /HTML/i.test(guard.reason), 'integrity: rejects HTML page served as an image');
 
   console.log(`\nALL ${passed} ASSERTIONS PASSED ✅`);
 })().catch(e => { console.error('TEST FAILED ❌', e); process.exit(1); });

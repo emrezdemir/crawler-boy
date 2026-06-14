@@ -2,6 +2,16 @@
 
 _Last updated: 2026-06-14_
 
+## ✅ Done (v1.4.0)
+- [x] **Download integrity**: magic-byte sniff (`utils.sniffBinaryType`) rejects
+      HTML-served-as-binary (wiki `File:` pages) and assigns the correct extension
+      from the real type — fixes "format not supported" / unopenable files.
+- [x] `summary.txt` + streamed `downloaded-files.txt` outputs.
+- [x] Renderer **rolling-window tables** (only fit-to-window rows in DOM; full
+      lists on disk) → flat memory on huge crawls. Set/Map for in-memory state.
+- [x] README screenshots via `tools/screenshot.js` (Electron capturePage).
+- [x] Tests: 69 assertions (sniff + integrity guard). Per-version git tags.
+
 ## ✅ Done (v1.3.0)
 - [x] Optional **organize-by-file-type** download layout: `assets/<ext>/<file>`
       (one folder per extension), collision-safe readable names, ext from URL or

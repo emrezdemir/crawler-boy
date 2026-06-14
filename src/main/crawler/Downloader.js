@@ -9,7 +9,13 @@ const {
   hashString,
   extOf,
   extFromContentType,
+  sniffBinaryType,
+  formatBytes,
 } = require('./utils');
+
+// Categories whose files must be real binaries — used to reject HTML pages
+// served under an image/pdf/etc. URL.
+const BINARY_CATEGORIES = new Set(['images', 'media', 'documents', 'archives', 'fonts']);
 
 /**
  * Downloader — owns the on-disk layout for a crawl session and persists
@@ -44,6 +50,8 @@ class Downloader {
     this.organizeByExtension = organizeByExtension;
     this.downloaded = new Set(); // asset URLs already handled
     this.usedPaths = new Set(); // taken file paths (for collision-free flat folders)
+    this.byCategory = {}; // category -> count
+    this.fileListStream = null; // streamed downloaded-files.txt
     this.bytes = 0;
     this.count = 0;
   }
@@ -94,17 +102,66 @@ class Downloader {
       return { status: 'skipped', reason: 'too-large', bytes: result.buffer.length };
     }
 
+    // Integrity check: reject HTML pages masquerading as binary files (e.g. a
+    // wiki "File:Foo.jpg" link that actually serves an HTML description page).
+    const sniff = sniffBinaryType(result.buffer);
+    if (BINARY_CATEGORIES.has(type)) {
+      const ctHtml = /text\/html/i.test(result.contentType);
+      const isSvg = sniff === 'svg' || /image\/svg/i.test(result.contentType);
+      if ((sniff === 'html' || ctHtml) && !isSvg) {
+        return { status: 'skipped', reason: 'not-a-file (server returned HTML)' };
+      }
+    }
+
     try {
-      const full = this.organizeByExtension
-        ? this._extensionPath(url, result.contentType)
-        : path.join(this.sessionDir, 'assets', type, urlToLocalPath(url, { indexName: `asset_${hashString(url)}.bin` }));
+      let full;
+      if (this.organizeByExtension) {
+        full = this._extensionPath(url, result.contentType, sniff);
+      } else {
+        let rel = urlToLocalPath(url, { indexName: `asset_${hashString(url)}.bin` });
+        // Ensure the saved file has a real extension so the OS can open it —
+        // many CDN/thumbnail URLs end with no extension (e.g. .../width/60).
+        if (!path.extname(rel)) {
+          const realExt =
+            (sniff && !['html', 'xml'].includes(sniff) ? sniff : '') ||
+            extFromContentType(result.contentType) ||
+            extOf(url);
+          if (realExt) rel += `.${realExt}`;
+        }
+        full = path.join(this.sessionDir, 'assets', type, rel);
+      }
       await fsp.mkdir(path.dirname(full), { recursive: true });
       await fsp.writeFile(full, result.buffer);
       this.bytes += result.buffer.length;
       this.count++;
+      this.byCategory[type] = (this.byCategory[type] || 0) + 1;
+      this._appendFileList(full, result.buffer.length);
       return { status: 'ok', path: full, bytes: result.buffer.length, category: type };
     } catch (err) {
       return { status: 'error', reason: err.message };
+    }
+  }
+
+  /** Append a downloaded file's path to downloaded-files.txt (streamed). */
+  _appendFileList(fullPath, bytes) {
+    try {
+      if (!this.fileListStream) {
+        this.fileListStream = fs.createWriteStream(
+          path.join(this.sessionDir, 'downloaded-files.txt'),
+          { flags: 'w' }
+        );
+      }
+      this.fileListStream.write(`${fullPath}\t${bytes}\n`);
+    } catch {
+      /* non-fatal */
+    }
+  }
+
+  /** Flush and close the streamed file list. */
+  async finishFileList() {
+    if (this.fileListStream) {
+      await new Promise((resolve) => this.fileListStream.end(resolve));
+      this.fileListStream = null;
     }
   }
 
@@ -112,8 +169,11 @@ class Downloader {
    * Build a collision-free path inside a per-extension folder:
    * assets/<ext>/<file>. Keeps readable names; disambiguates clashes with a hash.
    */
-  _extensionPath(url, contentType) {
-    const ext = (extOf(url) || extFromContentType(contentType) || 'other').toLowerCase();
+  _extensionPath(url, contentType, sniff) {
+    // Prefer the *real* sniffed type so a mislabeled file lands in the right
+    // folder (e.g. a .jpg that is actually a PNG goes under png/).
+    const real = sniff && !['html', 'xml'].includes(sniff) ? sniff : '';
+    const ext = (real || extOf(url) || extFromContentType(contentType) || 'other').toLowerCase();
     let base = '';
     try {
       const u = new URL(url);
@@ -122,7 +182,7 @@ class Downloader {
       base = '';
     }
     if (!base) base = `file_${hashString(url).slice(0, 8)}`;
-    if (ext && !base.toLowerCase().endsWith(`.${ext}`)) base += `.${ext}`;
+    if (!path.extname(base)) base += `.${ext}`;
 
     let full = path.join(this.sessionDir, 'assets', ext, base);
     if (this.usedPaths.has(full.toLowerCase())) {
@@ -132,6 +192,50 @@ class Downloader {
     }
     this.usedPaths.add(full.toLowerCase());
     return full;
+  }
+
+  /** Write a human-readable summary.txt to the session folder. */
+  async writeSummaryText(summary) {
+    const lines = [];
+    const L = (s = '') => lines.push(s);
+    L('CrawlerBoy — Crawl Summary');
+    L('==========================');
+    L(`Seeds            : ${(summary.seeds || []).join(', ')}`);
+    L(`State            : ${summary.state}`);
+    L(`Elapsed          : ${Math.round((summary.elapsedMs || 0) / 1000)}s`);
+    L('');
+    L(`Pages crawled    : ${summary.crawled}`);
+    L(`Files downloaded : ${summary.downloaded}  (${formatBytes(summary.downloadedBytes || 0)})`);
+    L(`Total data       : ${summary.humanBytes}`);
+    L(`Errors           : ${summary.errors}`);
+    L(`Escalated        : ${summary.escalated}`);
+    L(`Hosts seen       : ${(summary.hosts || []).length}`);
+    const cats = Object.entries(this.byCategory).sort((a, b) => b[1] - a[1]);
+    if (cats.length) {
+      L('');
+      L('Downloads by type:');
+      for (const [cat, n] of cats) L(`  ${cat.padEnd(11)} ${n}`);
+    }
+    if (summary.intelCounts) {
+      const ic = summary.intelCounts;
+      L('');
+      L(`Intel            : ${ic.emails} emails, ${ic.endpoints} endpoints, ${ic.socials} socials, ${ic.secrets} secrets, ${ic.comments} comments`);
+    }
+    L('');
+    L('Artifacts (in this folder):');
+    L('  data/crawl-data.json  — pages + summary');
+    L('  data/assets.json      — downloaded files index');
+    L('  data/links.json       — page link graph');
+    L('  data/forms.json       — enumerated forms');
+    if (summary.intelCounts && summary.intelCounts.endpoints + summary.intelCounts.emails > 0) {
+      L('  data/intel.json       — recon intel');
+    }
+    L('  downloaded-files.txt  — every saved file (path<TAB>bytes)');
+    try {
+      await fsp.writeFile(path.join(this.sessionDir, 'summary.txt'), lines.join('\n'), 'utf8');
+    } catch {
+      /* non-fatal */
+    }
   }
 
   /** Write the structured crawl results to data/. */

@@ -14,6 +14,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Plugin/hook system for custom extractors.
 - Scheduling (cron-style recurring crawls).
 
+## [1.4.0] — 2026-06-14
+
+### Added
+- **File integrity & correct extensions**: downloads are now verified by their
+  magic bytes. HTML pages served under an image/PDF/etc. URL (e.g. a wiki
+  `File:Foo.jpg` description page) are **rejected** instead of saved as corrupt
+  files, and every file is given the right extension based on its *real* sniffed
+  type — fixing "this file format may not be supported" when opening downloads.
+- **`summary.txt`** (human-readable run report) and **`downloaded-files.txt`**
+  (every saved file as `path⇥bytes`, streamed live) written to the session folder.
+- **README screenshots** + an `npm run screenshots` generator (`tools/screenshot.js`).
+
+### Changed / performance
+- **Live tables use a rolling window**: the Pages/Assets/Intel/Errors tables now
+  keep only as many rows as fit the window and drop older ones from the DOM
+  (counters still show the true total). Keeps renderer memory flat on huge crawls
+  — the full lists live in the on-disk artifacts.
+- In-memory dedup/state stays in hash-based `Set`/`Map` collections (the JS
+  equivalent of .NET `HashSet`/`Dictionary`); the downloaded-file list is streamed
+  to disk rather than only held in memory.
+
 ## [1.3.0] — 2026-06-14
 
 ### Added

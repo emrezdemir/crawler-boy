@@ -9,9 +9,19 @@ Built with Electron — crawls even JavaScript-heavy, bot-protected sites by ren
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-2f81f7)
 ![Electron](https://img.shields.io/badge/Electron-33-3fb950)
 
+![CrawlerBoy dashboard](assets/screenshots/dashboard.png)
+
 </div>
 
 ---
+
+## 📸 Screenshots
+
+| Dashboard — live crawl | First-launch consent gate |
+| --- | --- |
+| ![Dashboard](assets/screenshots/dashboard.png) | ![Terms & Disclaimer](assets/screenshots/disclaimer.png) |
+
+> Regenerate with `npm run screenshots`.
 
 ## Why CrawlerBoy?
 
@@ -129,15 +139,21 @@ fully-built content comes through.
 ├─ assets/     downloaded files. Layout depends on the "group by file type" toggle:
 │                off → assets/<category>/<host>/<path>   (site mirror)
 │                on  → assets/<ext>/<file>               (png/, jpg/, pdf/ …)
-└─ data/
-   ├─ crawl-data.json   pages + summary
-   ├─ assets.json       downloaded files index
-   ├─ links.json        page → outbound links graph
-   ├─ forms.json        enumerated forms per page
-   ├─ intel.json        emails, secrets, endpoints, socials, comments (if enabled)
-   ├─ security.json     security-header + tech audit (if enabled)
-   └─ errors.json       failures
+├─ data/
+│  ├─ crawl-data.json   pages + summary
+│  ├─ assets.json       downloaded files index
+│  ├─ links.json        page → outbound links graph
+│  ├─ forms.json        enumerated forms per page
+│  ├─ intel.json        emails, secrets, endpoints, socials, comments (if enabled)
+│  ├─ security.json     security-header + tech audit (if enabled)
+│  └─ errors.json       failures
+├─ downloaded-files.txt  every saved file (path⇥bytes), streamed live
+└─ summary.txt           human-readable run summary
 ```
+
+Downloads are **integrity-checked**: HTML pages served under an image/PDF/etc.
+URL are rejected, and every file gets a correct extension based on its real
+(magic-byte-sniffed) type — so the files always open properly.
 
 ## 🛡️ Responsible use
 
