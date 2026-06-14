@@ -22,12 +22,20 @@ dashboard UI. Documentation and governance are in place.
   create/destroy-per-page (see `Fetcher` window pool in systemPatterns).
 - **Added an ad/tracker blocker** to the render session.
 
+## Published
+
+- Repo is live at **https://github.com/emrezdemir/crawler-boy** (branch `main`).
+- `GITHUB_URL` in `renderer.js` and the repo links are set.
+- Personal data scrubbed for the public repo: no real email in `package.json` /
+  `LICENSE`; commit identity uses the GitHub noreply address.
+- Added a first-launch **Terms of Use & Disclaimer** consent gate + `DISCLAIMER.md`.
+
 ## Immediate next steps
 
-1. Interactive GUI smoke test (`npm start`) — confirm the dashboard drives a crawl.
-2. (User) Initialize git and push to GitHub. Update `GITHUB_URL` in
-   `src/renderer/renderer.js` and the badge/clone URLs in `README.md`.
-3. Optional: produce platform icons and run `npm run dist:*` to build installers.
+1. Interactive GUI smoke test — confirm the dashboard drives a crawl end to end.
+2. Optional: produce platform-specific icons (.ico/.icns) and run `npm run dist:*`
+   to build installers; attach them to a GitHub release.
+3. Optional backlog items (proxy, resumable crawls, link-graph view).
 
 ## Open questions / decisions pending
 
