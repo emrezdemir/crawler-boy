@@ -14,6 +14,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Plugin/hook system for custom extractors.
 - Scheduling (cron-style recurring crawls).
 
+## [1.2.0] — 2026-06-14
+
+### Performance (fixes UI freezing on large crawls)
+- **Worker-thread analyzer pool** (`AnalyzerPool` + `analyzer-worker.js`): HTML
+  parsing (cheerio) and all recon regexes now run in a pool of worker threads
+  instead of on Electron's main thread. Previously, parsing big JS-heavy pages
+  (~1 MB+) across several concurrent workers blocked the main process — and with
+  it the OS window message loop — making the app freeze / "Not Responding" on
+  Windows. The main process now stays responsive under load.
+  - Pool size auto-scales to CPU cores (overridable via the new **Worker threads**
+    field; `0` = auto). Per-task timeout retires and replaces a hung worker.
+- **Skip ad/tracker asset downloads**: when tracker-blocking is on, known
+  ad/analytics scripts (Google Tag Manager, Scorecard, btloader, …) are no longer
+  downloaded — less bandwidth and disk, fewer junk files. The tracker list is now
+  shared between the render blocker and the download filter.
+- Asset downloads already skip oversize files via a `Content-Length` pre-check.
+- **Render windows** default raised 2 → 3 for better escalation throughput.
+- Renderer coalesces table auto-scroll to one reflow per frame.
+
 ## [1.1.0] — 2026-06-14
 
 ### Added — white-hat recon toolkit

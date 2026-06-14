@@ -2,6 +2,15 @@
 
 _Last updated: 2026-06-14_
 
+## ✅ Done (v1.2.0 — performance)
+- [x] **Worker-thread analyzer pool** (`AnalyzerPool` + `analyzer-worker.js`):
+      parse + recon moved off the main thread. Fixes the Windows freeze /
+      "Not Responding" on large JS-heavy crawls (main thread was CPU-blocked).
+- [x] Skip ad/tracker asset downloads when tracker-blocking is on (shared
+      `isTracker` in utils). Render windows default 2 → 3. Coalesced UI autoscroll.
+- [x] Tests: 57 assertions (added AnalyzerPool + isTracker). Verified live Fandom
+      run: 5 pages, 640 files, intel 860 endpoints — all via worker threads.
+
 ## ✅ Done (v1.1.0 — white-hat recon update)
 - [x] `Recon.js`: intel extraction (emails, phones, secrets/API keys, socials,
       endpoints, comments) + security-header audit + tech fingerprinting.

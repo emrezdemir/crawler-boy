@@ -22,6 +22,9 @@ ok(u.categoryOf('https://x.com/pic.PNG') === 'images', 'categoryOf images (case-
 ok(u.categoryOf('https://x.com/a.pdf') === 'documents', 'categoryOf documents');
 ok(u.urlToLocalPath('https://x.com/a/b/').endsWith('index.html'), 'urlToLocalPath dir -> index.html');
 ok(u.compilePatterns('/wiki/\nSpecial:').length === 2, 'compilePatterns splits lines');
+ok(u.isTracker('https://www.googletagmanager.com/gtm.js') === true, 'isTracker flags googletagmanager');
+ok(u.isTracker('https://sb.scorecardresearch.com/beacon.js') === true, 'isTracker flags scorecardresearch');
+ok(u.isTracker('https://static.wikia.nocookie.net/img/x.png') === false, 'isTracker passes a real asset host');
 
 console.log('Frontier:');
 const f = new Frontier({ order: 'bfs' });
@@ -100,6 +103,25 @@ console.log('RobotsManager:');
   ok((await rm.sitemaps('https://s.com/')).includes('https://s.com/sitemap.xml'), 'robots sitemap parsed');
   const rm2 = new RobotsManager({ respect: false, userAgent: 'X', fetchText: async () => robotsTxt });
   ok((await rm2.isAllowed('https://s.com/private/secret')) === true, 'respect=false allows everything');
+
+  console.log('AnalyzerPool (worker threads):');
+  const AnalyzerPool = require('../src/main/crawler/AnalyzerPool');
+  const pool = new AnalyzerPool({ size: 2 });
+  const a = await pool.analyze(
+    '<html><head><title>T</title></head><body><a href="/x">x</a><img src="/i.png"></body></html>',
+    'https://s.com/',
+    { intel: true, audit: true, headers: { server: 'nginx' } }
+  );
+  ok(a.meta.title === 'T', 'pool: parse runs off-thread (meta)');
+  ok(a.links.includes('https://s.com/x'), 'pool: links returned');
+  ok(a.assets.some((x) => x.url === 'https://s.com/i.png'), 'pool: assets returned');
+  ok(a.security && a.security.tech.some((t) => /nginx/i.test(t)), 'pool: audit runs in worker');
+  // Run several concurrently to exercise queueing across the pool.
+  const many = await Promise.all(Array.from({ length: 6 }, (_, i) =>
+    pool.analyze(`<html><body><a href="/p${i}">l</a></body></html>`, 'https://s.com/', {})
+  ));
+  ok(many.every((m) => m.links.length === 1), 'pool: handles concurrent tasks');
+  await pool.destroy();
 
   console.log(`\nALL ${passed} ASSERTIONS PASSED ✅`);
 })().catch(e => { console.error('TEST FAILED ❌', e); process.exit(1); });

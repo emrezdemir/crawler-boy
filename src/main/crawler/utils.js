@@ -190,6 +190,30 @@ function hashString(str) {
   return (h >>> 0).toString(16).padStart(8, '0');
 }
 
+// Hostname tokens for ad / tracker / analytics / cookie-sync endpoints. Shared
+// by the render-time request blocker and the asset-download filter.
+const TRACKER_TOKENS = [
+  'doubleclick', 'googlesyndication', 'google-analytics', 'googletagservices',
+  'googletagmanager', 'adservice', 'adsystem', 'adnxs', 'criteo', 'pubmatic',
+  'rubicon', 'openx', 'taboola', 'outbrain', 'scorecardresearch', 'quantserve',
+  'moatads', 'adsrvr', '3lift', 'casalemedia', 'sharethrough', 'teads',
+  'smartadserver', 'yieldmo', 'bidswitch', 'omnitag', 'smilewanted',
+  'nextmillmedia', 'gammaplatform', 'unrulymedia', 'programmaticx', 'marphezis',
+  'vidazoo', 'adyoulike', 'amazon-adsystem', 'indexww', 'bidder', 'prebid',
+  'usersync', 'cookiesync', 'bsync', 'omnitagjs', 'demdex', 'crwdcntrl',
+  'btloader', 'btmessage', 'adsafeprotected', 'taboola', 'mgid', 'zergnet',
+];
+const TRACKER_RE = new RegExp(TRACKER_TOKENS.join('|'), 'i');
+
+/** True if a URL's hostname looks like an ad / tracker / analytics endpoint. */
+function isTracker(url) {
+  try {
+    return TRACKER_RE.test(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
 /** Compile a newline/comma separated list of patterns into RegExp[]. Empty -> []. */
 function compilePatterns(raw) {
   if (!raw) return [];
@@ -222,4 +246,5 @@ module.exports = {
   urlToLocalPath,
   hashString,
   compilePatterns,
+  isTracker,
 };

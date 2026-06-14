@@ -134,6 +134,10 @@
               <span>Retries</span>
               <input id="maxRetries" type="number" value="2" min="0" max="6" />
             </label>
+            <label class="field">
+              <span>Worker threads <small>(0 = auto)</small></span>
+              <input id="analyzerThreads" type="number" value="0" min="0" max="16" />
+            </label>
           </div>
           <label class="check"><input type="checkbox" id="jitter" checked /> Randomized delay (jitter)</label>
         </div>
@@ -215,7 +219,7 @@
           <div class="grid2">
             <label class="field">
               <span>Render windows</span>
-              <input id="renderConcurrency" type="number" value="2" min="1" max="6" />
+              <input id="renderConcurrency" type="number" value="3" min="1" max="6" />
             </label>
             <label class="field">
               <span>Render settle (ms)</span>

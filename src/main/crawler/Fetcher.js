@@ -1,6 +1,6 @@
 'use strict';
 
-const { sleep } = require('./utils');
+const { sleep, isTracker } = require('./utils');
 
 /** Convert a fetch Headers object into a plain lowercase-keyed object. */
 function headersToObject(h) {
@@ -42,23 +42,6 @@ const DEFAULT_UA_POOL = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0',
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15',
 ];
-
-// Hostnames matching these tokens are ad / tracker / cookie-sync endpoints.
-// Blocking them during render makes pages load faster and cleaner without
-// touching real content. Toggle via config.blockTrackers (default on).
-const TRACKER_RE = new RegExp(
-  [
-    'doubleclick', 'googlesyndication', 'google-analytics', 'googletagservices',
-    'googletagmanager', 'adservice', 'adsystem', 'adnxs', 'criteo', 'pubmatic',
-    'rubicon', 'openx', 'taboola', 'outbrain', 'scorecardresearch', 'quantserve',
-    'moatads', 'adsrvr', '3lift', 'casalemedia', 'sharethrough', 'teads',
-    'smartadserver', 'yieldmo', 'bidswitch', 'omnitag', 'smilewanted',
-    'nextmillmedia', 'gammaplatform', 'unrulymedia', 'programmaticx', 'marphezis',
-    'vidazoo', 'adyoulike', 'amazon-adsystem', 'indexww', 'bidder', 'prebid',
-    'usersync', 'cookiesync', 'bsync', 'omnitagjs', 'demdex', 'crwdcntrl',
-  ].join('|'),
-  'i'
-);
 
 // Markers that strongly suggest an anti-bot interstitial or empty JS shell.
 const CHALLENGE_MARKERS = [
@@ -282,12 +265,7 @@ class Fetcher {
     // Block ad / tracker / cookie-sync requests during render (faster, quieter).
     if (this.config.blockTrackers !== false) {
       ses.webRequest.onBeforeRequest((details, cb) => {
-        try {
-          const host = new URL(details.url).hostname;
-          if (TRACKER_RE.test(host)) return cb({ cancel: true });
-        } catch {
-          /* unparseable URL → let it through */
-        }
+        if (isTracker(details.url)) return cb({ cancel: true });
         cb({});
       });
     }

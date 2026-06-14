@@ -55,6 +55,7 @@ function gatherConfig() {
     delay: int($('delay').value, 300),
     timeout: int($('timeout').value, 30000),
     maxRetries: int($('maxRetries').value, 2),
+    analyzerThreads: int($('analyzerThreads').value, 0) || undefined,
     jitter: $('jitter').checked,
     maxDepth: int($('maxDepth').value, 5),
     maxPages: int($('maxPages').value, 500),
@@ -403,9 +404,17 @@ function bindOpen(el, url) {
   el.addEventListener('click', () => window.crawler.openExternal(url));
 }
 
+// Coalesce autoscroll to at most once per animation frame per pane — appending
+// hundreds of rows per second otherwise forces a layout on every single row.
+const scrollPending = new Set();
 function autoScrollTable(body) {
   const pane = body.closest('.tab-pane');
-  if (pane && pane.classList.contains('active')) pane.scrollTop = pane.scrollHeight;
+  if (!pane || !pane.classList.contains('active') || scrollPending.has(pane)) return;
+  scrollPending.add(pane);
+  requestAnimationFrame(() => {
+    scrollPending.delete(pane);
+    pane.scrollTop = pane.scrollHeight;
+  });
 }
 
 // ---------------------------------------------------------------------------

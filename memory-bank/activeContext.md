@@ -4,11 +4,16 @@ _Last updated: 2026-06-14_
 
 ## Current focus
 
-**v1.1.0 — white-hat recon update shipped.** On top of the v1.0.0 crawler we
-added a passive recon layer (`Recon.js`: intel/secrets/endpoints + security &
-tech audit), form enumeration, proxy support (HTTP/SOCKS, via Electron
-`net.fetch`), custom headers, an Intel tab, and a cleaner Downloads UX (no more
-double "All"). All verified live against the original Fandom target.
+**v1.2.0 — performance fix.** A user hit a Windows freeze on a large crawl: the
+main process was CPU-blocked doing synchronous cheerio parsing + recon regexes on
+~1 MB pages across concurrent workers, which froze Electron's window message loop.
+Fix: **`AnalyzerPool`** moves parse + recon into worker threads, keeping the main
+process responsive. Also: skip ad/tracker asset downloads, render windows default
+3, coalesced UI autoscroll.
+
+Earlier: v1.1.0 added the passive recon layer (`Recon.js`: intel/secrets/endpoints
++ security & tech audit), form enumeration, proxy (HTTP/SOCKS via `net.fetch`),
+custom headers, the Intel tab, and a cleaner Downloads UX.
 
 ## What just happened
 

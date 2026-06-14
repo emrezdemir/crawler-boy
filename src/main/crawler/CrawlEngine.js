@@ -9,12 +9,14 @@ const Downloader = require('./Downloader');
 const { Fetcher } = require('./Fetcher');
 const { parse } = require('./Parser');
 const { extractIntel, auditSecurity } = require('./Recon');
+const AnalyzerPool = require('./AnalyzerPool');
 const {
   sleep,
   normalizeUrl,
   inScope,
   compilePatterns,
   formatBytes,
+  isTracker,
 } = require('./utils');
 
 // Small counting semaphore for bounding concurrent asset downloads.
@@ -76,6 +78,9 @@ class CrawlEngine extends EventEmitter {
     this.include = compilePatterns(config.includePatterns);
     this.exclude = compilePatterns(config.excludePatterns);
     this.assetPool = new Pool(config.assetConcurrency || 4);
+    // Parse + recon run in worker threads so the main process (and the UI) stay
+    // responsive even on big, JS-heavy pages.
+    this.analyzer = new AnalyzerPool({ size: config.analyzerThreads });
 
     this.seeds = (config.seedUrls && config.seedUrls.length
       ? config.seedUrls
@@ -234,6 +239,11 @@ class CrawlEngine extends EventEmitter {
     } catch {
       /* ignore teardown errors */
     }
+    try {
+      await this.analyzer.destroy();
+    } catch {
+      /* ignore teardown errors */
+    }
     this.log(
       `Done. Crawled ${this.stats.crawled} page(s), downloaded ${this.stats.downloaded} asset(s), ` +
         `${formatBytes(this.stats.pageBytes + this.stats.downloadedBytes)} total.`
@@ -298,8 +308,7 @@ class CrawlEngine extends EventEmitter {
     return true;
   }
 
-  _collectIntel(html, links, page, record) {
-    const found = extractIntel(html, links);
+  _mergeIntel(found, page, record) {
     const newRows = [];
     const addSet = (set, arr, kind, cap = Infinity) => {
       for (const v of arr) {
@@ -371,9 +380,28 @@ class CrawlEngine extends EventEmitter {
 
     const finalUrl = normalizeUrl(result.finalUrl) || url;
     let parsed = { meta: {}, links: [], assets: [], forms: [] };
+    let intelResult = null;
+    let securityResult = null;
     const isHtml = /html|xml/i.test(result.contentType) || !result.contentType;
     if (isHtml && result.html) {
-      parsed = parse(result.html, finalUrl);
+      const wantIntel = !!this.config.extractIntel;
+      const wantAudit = !!this.config.auditSecurity;
+      try {
+        // Off-thread parse + recon keeps the main process responsive.
+        const a = await this.analyzer.analyze(result.html, finalUrl, {
+          intel: wantIntel,
+          audit: wantAudit,
+          headers: result.headers || {},
+        });
+        parsed = { meta: a.meta, links: a.links, assets: a.assets, forms: a.forms || [] };
+        intelResult = a.intel || null;
+        securityResult = a.security || null;
+      } catch (err) {
+        // Fallback: parse inline so a worker hiccup never drops a page.
+        parsed = parse(result.html, finalUrl);
+        if (wantIntel) intelResult = extractIntel(result.html, parsed.links);
+        if (wantAudit) securityResult = auditSecurity(result.headers || {}, parsed.meta, finalUrl, result.html);
+      }
     }
 
     const pageBytes = result.html ? Buffer.byteLength(result.html) : 0;
@@ -426,17 +454,16 @@ class CrawlEngine extends EventEmitter {
     this.stats.forms += parsed.forms.length;
     this.hosts.add(host);
 
-    // Passive recon — intel extraction + security/tech audit (opt-in).
-    if (this.config.extractIntel && isHtml && result.html) {
-      this._collectIntel(result.html, parsed.links, finalUrl, record);
+    // Passive recon — merge the worker-computed intel / audit (opt-in).
+    if (intelResult) {
+      this._mergeIntel(intelResult, finalUrl, record);
     }
-    if (this.config.auditSecurity && isHtml) {
-      const audit = auditSecurity(result.headers || {}, parsed.meta, finalUrl, result.html || '');
-      this.security.push(audit);
+    if (securityResult) {
+      this.security.push(securityResult);
       record.security = {
-        missing: audit.missingHeaders,
-        tech: audit.tech,
-        cookieIssues: audit.cookieIssues,
+        missing: securityResult.missingHeaders,
+        tech: securityResult.tech,
+        cookieIssues: securityResult.cookieIssues,
       };
     }
 
@@ -467,7 +494,10 @@ class CrawlEngine extends EventEmitter {
   }
 
   async _downloadAssets(assets, fromPage) {
-    const wanted = assets.filter((a) => this.downloader.wantsCategory(a.type));
+    const blockTrackers = this.config.blockTrackers !== false;
+    const wanted = assets.filter(
+      (a) => this.downloader.wantsCategory(a.type) && !(blockTrackers && isTracker(a.url))
+    );
     await Promise.all(
       wanted.map((asset) =>
         this.assetPool.run(async () => {

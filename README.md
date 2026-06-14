@@ -42,6 +42,8 @@ would see.
 - **Depth & page limits**, include/exclude **regex filters**.
 - **Concurrency** with a worker pool and **polite per-host rate limiting**
   (configurable delay + jitter, honours robots `Crawl-delay`).
+- **Multi-threaded analysis**: HTML parsing + recon run in a pool of worker
+  threads, so the UI stays responsive even on big, JS-heavy pages.
 - **robots.txt** parsing (Allow/Disallow, wildcards, `$`, longest-match) —
   respected by default, toggleable for authorized testing.
 - **Sitemap discovery** (`robots.txt` + `/sitemap.xml`, nested indexes).
@@ -162,6 +164,8 @@ src/
 │     ├─ Fetcher.js        HTTP (net.fetch) + Chromium render + auto-escalation + proxy
 │     ├─ Parser.js         link / asset / form extraction (cheerio)
 │     ├─ Recon.js          intel extraction + security & tech audit
+│     ├─ AnalyzerPool.js   worker-thread pool (parse + recon off the main thread)
+│     ├─ analyzer-worker.js  the worker entry point
 │     ├─ Frontier.js       URL queue + visited set
 │     ├─ RobotsManager.js  robots.txt fetch/parse/evaluate
 │     ├─ Downloader.js     disk layout, asset/page saving, exporters
